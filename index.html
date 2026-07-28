@@ -22,6 +22,17 @@
     /* surfaces that stay dark by design (authentic IG): */
     --ink: #000;         /* fullscreen viewer shell + video/media backing */
   }
+ <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+ <script>
+  const SUPABASE_URL = "https://lhyejtkqmkcesigjcsfk.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_aenAxZw-gQgCKsz3EHQSHg_7D2DT4-J";
+
+  const supabaseClient = supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+</script>
+ 
   body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     background: var(--bg);
