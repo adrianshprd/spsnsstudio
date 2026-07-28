@@ -22,17 +22,6 @@
     /* surfaces that stay dark by design (authentic IG): */
     --ink: #000;         /* fullscreen viewer shell + video/media backing */
   }
- <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
- <script>
-  const SUPABASE_URL = "https://lhyejtkqmkcesigjcsfk.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_aenAxZw-gQgCKsz3EHQSHg_7D2DT4-J";
-
-  const supabaseClient = supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY
-  );
-</script>
- 
   body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     background: var(--bg);
@@ -1163,6 +1152,13 @@
     .post-card { max-width: 100%; }
   }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://lhyejtkqmkcesigjcsfk.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_aenAxZw-gQgCKsz3EHQSHg_7D2DT4-J";
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const SUPABASE_BUCKET = "post-media";
+</script>
 </head>
 <body>
 
@@ -1240,45 +1236,96 @@
    *   (stored as base64 data URLs) may not fit; a backend swap is
    *   the right move for heavy media.
    * ============================================================ */
-  const STORAGE_KEY = 'sns_studio_posts';
-  let storageWarned = false;
+  const STORAGE_KEY = 'sns_studio_posts'; // legacy key; no longer used for media
 
-  function savePosts() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
-    } catch (err) {
-      if (!storageWarned) {
-        storageWarned = true;
-        alert('⚠️ Browser storage is full — this post will not survive a reload.\n\nlocalStorage holds ~5 MB. Large videos may not fit; reroute STORAGE (see the STORAGE section at the top of the script) to fix this.');
-      }
-      console.warn('savePosts failed:', err);
+  async function savePosts() {
+    const persistentPosts = posts.filter(post => !post.isDemo);
+    if (persistentPosts.length === 0) return;
+
+    const rows = persistentPosts.map(post => ({
+      id: post.id,
+      data: post,
+      updated_at: new Date().toISOString()
+    }));
+
+    const { error } = await supabaseClient
+      .from('sns_posts')
+      .upsert(rows, { onConflict: 'id' });
+
+    if (error) {
+      console.error('savePosts failed:', error);
+      alert('Could not save this post to Supabase: ' + error.message);
     }
   }
 
-  function loadPosts() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw !== null) {
-        const saved = JSON.parse(raw);
-        if (Array.isArray(saved)) {
-          nextId = saved.reduce((max, p) => Math.max(max, p.id || 0), 0) + 1;
-          return saved;
-        }
-      }
-    } catch (err) {
-      console.warn('loadPosts failed:', err);
+  async function loadPosts() {
+    if (Array.isArray(window.__EXPORTED_POSTS__)) {
+      const exported = window.__EXPORTED_POSTS__;
+      nextId = exported.reduce((max, post) => Math.max(max, Number(post.id) || 0), 0) + 1;
+      return exported;
     }
-    // First run ever (nothing saved yet): seed the demo posts
+
+    const { data, error } = await supabaseClient
+      .from('sns_posts')
+      .select('id, data')
+      .order('id', { ascending: false });
+
+    if (error) {
+      console.error('loadPosts failed:', error);
+      alert('Could not load posts from Supabase: ' + error.message);
+      return [...demoPosts];
+    }
+
+    const saved = (data || []).map(row => row.data).filter(Boolean);
+    if (saved.length > 0) {
+      nextId = saved.reduce((max, post) => Math.max(max, Number(post.id) || 0), 0) + 1;
+      return saved;
+    }
+
     return [...demoPosts];
   }
 
-  function fileToDataURL(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+  function safeFileName(name) {
+    return String(name || 'upload')
+      .normalize('NFKD')
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'upload';
+  }
+
+  async function uploadMediaFile(file) {
+    const uniqueName = `${Date.now()}-${crypto.randomUUID()}-${safeFileName(file.name)}`;
+    const path = `posts/${uniqueName}`;
+
+    const { data, error } = await supabaseClient.storage
+      .from(SUPABASE_BUCKET)
+      .upload(path, file, {
+        cacheControl: '3600',
+        contentType: file.type || undefined,
+        upsert: false
+      });
+
+    if (error) throw error;
+
+    const { data: publicData } = supabaseClient.storage
+      .from(SUPABASE_BUCKET)
+      .getPublicUrl(data.path);
+
+    return {
+      url: publicData.publicUrl,
+      path: data.path,
+      mediaType: file.type.startsWith('video/') ? 'video' : 'image'
+    };
+  }
+
+  function getPostStoragePaths(post) {
+    const paths = [];
+    if (post.storagePath) paths.push(post.storagePath);
+    if (Array.isArray(post.slides)) {
+      post.slides.forEach(slide => {
+        if (slide && slide.storagePath) paths.push(slide.storagePath);
+      });
+    }
+    return paths;
   }
 
   const demoPosts = [
@@ -1324,7 +1371,6 @@
       isDemo: true
     }
   ];
-  posts = loadPosts();
 
   function renderGallery() {
     const gallery = document.getElementById('gallery');
@@ -2201,18 +2247,39 @@
     svg.style.color = isLiked ? '' : '#ff3040'; // IG like red
   }
 
-  function deletePost(id) {
+  async function deletePost(id) {
+    const post = posts.find(p => p.id === id);
+    if (!post) return;
+
+    const paths = getPostStoragePaths(post);
+    if (paths.length > 0) {
+      const { error: storageError } = await supabaseClient.storage
+        .from(SUPABASE_BUCKET)
+        .remove(paths);
+      if (storageError) console.warn('Media deletion failed:', storageError);
+    }
+
+    if (!post.isDemo) {
+      const { error } = await supabaseClient
+        .from('sns_posts')
+        .delete()
+        .eq('id', id);
+      if (error) {
+        alert('Could not delete the post: ' + error.message);
+        return;
+      }
+    }
+
     posts = posts.filter(p => p.id !== id);
     delete videoRefs[id];
-    savePosts();
     renderGallery();
   }
 
-  function updateCaption(id, text) {
+  async function updateCaption(id, text) {
     const post = posts.find(p => p.id === id);
     if (post) {
       post.caption = text;
-      savePosts();
+      if (!post.isDemo) await savePosts();
     }
   }
 
@@ -2340,9 +2407,9 @@
     const OPEN_SCRIPT = '<scr' + 'ipt>';
     const CLOSE_BODY = '</bo' + 'dy>';
     const injector =
-      '<scr' + 'ipt>try{localStorage.setItem("sns_studio_posts",' +
-      JSON.stringify(JSON.stringify(cloned)).replace(/</g, '\\u003c') +
-      ')}catch(e){}</scr' + 'ipt>';
+      '<scr' + 'ipt>window.__EXPORTED_POSTS__=' +
+      JSON.stringify(cloned).replace(/</g, '\\u003c') +
+      ';</scr' + 'ipt>';
     const hardHide =
       '<style>.upload-zone,.tabs,.header-actions{display:none!important}</style>';
     const forceClient =
@@ -2373,36 +2440,43 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   }
 
-  function handleFiles(files) {
+  async function handleFiles(files) {
     const fileArray = Array.from(files);
     if (fileArray.length === 0) return;
 
-    // Read files as data URLs (not blob URLs) so media survives reload via savePosts()
-    Promise.all(fileArray.map(f =>
-      fileToDataURL(f).then(url => ({ url, mediaType: f.type.startsWith('video/') ? 'video' : 'image' }))
-    )).then(items => {
-      const images = items.filter(i => i.mediaType === 'image');
-      const videos = items.filter(i => i.mediaType === 'video');
+    const uploadZone = document.getElementById('uploadZone');
+    uploadZone.classList.add('dragover');
+
+    try {
+      const items = await Promise.all(fileArray.map(uploadMediaFile));
+      const images = items.filter(item => item.mediaType === 'image');
+      const videos = items.filter(item => item.mediaType === 'video');
+      const id = Date.now();
 
       if (videos.length === 1 && images.length === 0) {
         posts.unshift({
-          id: nextId++,
+          id,
           type: 'reel',
           username: 'yourbrand',
           avatar: 'YB',
           thumbnail: videos[0].url,
           videoUrl: videos[0].url,
+          storagePath: videos[0].path,
           caption: '',
           likes: Math.floor(Math.random() * 5000) + 500,
           views: (Math.random() * 50 + 5).toFixed(1) + 'K',
           isDemo: false
         });
       } else {
-        const allSlides = items.map(i => ({ url: i.url, type: i.mediaType }));
+        const allSlides = items.map(item => ({
+          url: item.url,
+          type: item.mediaType,
+          storagePath: item.path
+        }));
 
         if (allSlides.length > 0) {
           posts.unshift({
-            id: nextId++,
+            id,
             type: 'carousel',
             username: 'yourbrand',
             avatar: 'YB',
@@ -2415,9 +2489,16 @@
         }
       }
 
-      savePosts();
+      nextId = Math.max(nextId, id + 1);
+      await savePosts();
       renderGallery();
-    });
+      document.getElementById('fileInput').value = '';
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Upload failed: ' + (error.message || error));
+    } finally {
+      uploadZone.classList.remove('dragover');
+    }
   }
 
   const uploadZone = document.getElementById('uploadZone');
@@ -2433,7 +2514,12 @@
     if (e.key === 'Escape') closeViewer();
   });
 
-  renderGallery();
+  async function initializeApp() {
+    posts = await loadPosts();
+    renderGallery();
+  }
+
+  initializeApp();
 </script>
 
 </body>
