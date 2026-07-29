@@ -1254,6 +1254,89 @@
     .theme-btn, .auth-btn { padding: 8px 10px; }
   }
 
+
+
+  /* ===== PHASE A: INSTAGRAM-ACCURATE CLIENT PROFILE ===== */
+  .client-view .main-content { max-width: 935px; margin: 0 auto; }
+  .client-view #gallery { gap: 0; }
+  .ig-mobile-topbar {
+    display: none;
+    height: 44px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--bg);
+  }
+  .ig-mobile-topbar .ig-handle { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+  .ig-mobile-topbar .ig-top-actions { display: flex; align-items: center; gap: 18px; }
+  .ig-mobile-topbar svg { width: 24px; height: 24px; }
+  .profile-header { padding: 28px 20px 0; }
+  .profile-top { align-items: flex-start; gap: 72px; max-width: 760px; margin: 0 auto; }
+  .profile-avatar-wrap { width: 150px; flex: 0 0 150px; display: flex; justify-content: center; }
+  .profile-avatar { width: 150px; height: 150px; }
+  .profile-main { flex: 1; min-width: 0; }
+  .profile-title-row { display: flex; align-items: center; gap: 16px; min-height: 38px; }
+  .profile-handle { font-size: 20px; font-weight: 400; color: var(--text); }
+  .profile-title-actions { display: flex; gap: 8px; }
+  .profile-menu-btn { border: 0; background: transparent; color: var(--text); padding: 6px; cursor: pointer; }
+  .profile-menu-btn svg { width: 24px; height: 24px; display:block; }
+  .profile-stats { justify-content: flex-start; gap: 40px; margin-top: 18px; }
+  .profile-stats span { text-align: left; font-size: 16px; white-space: nowrap; }
+  .profile-stats b { display: inline; margin-right: 5px; font-size: 16px; }
+  .profile-bio.desktop-bio { margin-top: 18px; }
+  .profile-bio.mobile-bio { display:none; }
+  .profile-actions { margin-top: 16px; max-width: 760px; margin-left:auto; margin-right:auto; padding-left:222px; }
+  .pf-btn { min-height: 32px; padding: 6px 16px; border-radius: 8px; }
+  .pf-btn-dark { background: #0095f6; }
+  [data-theme="dark"] .pf-btn-light { background: #363636; color: #f5f5f5; }
+  .profile-highlights { max-width: 935px; margin: 24px auto 32px; gap: 44px; padding: 0 12px; }
+  .hl-ring { width: 77px; height: 77px; border: 1px solid var(--border); box-shadow: inset 0 0 0 3px var(--bg); }
+  .hl { font-size: 12px; font-weight: 600; }
+  .profile-tabs { max-width: 935px; margin: 0 auto; justify-content: center; gap: 60px; }
+  .pf-tab { flex: 0 0 auto; width: 90px; gap: 6px; align-items:center; padding: 14px 0 13px; border-bottom-width: 1px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+  .pf-tab svg { width: 12px; height: 12px; }
+  .pf-tab-label { display:inline; }
+  .profile-grid { gap: 4px; max-width: 935px; margin: 0 auto; }
+  .profile-grid.reels-grid .grid-cell { aspect-ratio: 3/4; }
+  .grid-cell { aspect-ratio: 3/4; }
+  .grid-cell::after { content:''; position:absolute; inset:0; background:rgba(0,0,0,0); transition:background .15s; pointer-events:none; }
+  .grid-cell:hover::after { background:rgba(0,0,0,.12); }
+  .grid-cell:hover img, .grid-cell:hover video { opacity:1; }
+  .grid-badge { top: 10px; right: 10px; }
+  .grid-views { left: 10px; bottom: 8px; }
+
+  @media (max-width: 735px) {
+    .client-view header { display:none; }
+    .ig-mobile-topbar { display:flex; }
+    .client-view .main-content { width:100%; padding:0; }
+    .profile-header { padding: 0; }
+    .profile-top { gap: 0; max-width:none; padding: 14px 16px 0; align-items:center; }
+    .profile-avatar-wrap { width: 86px; flex-basis:86px; justify-content:flex-start; }
+    .profile-avatar { width: 86px; height: 86px; }
+    .profile-main { flex:1; }
+    .profile-title-row { display:none; }
+    .profile-stats { margin:0; gap:0; justify-content:space-around; }
+    .profile-stats span { text-align:center; font-size:14px; }
+    .profile-stats b { display:block; margin:0; font-size:16px; }
+    .profile-bio.desktop-bio { display:none; }
+    .profile-bio.mobile-bio { display:block; padding: 0 16px; margin-top: 12px; font-size:14px; line-height:1.35; }
+    .profile-actions { margin: 14px 16px 0; padding:0; max-width:none; }
+    .pf-btn { padding: 6px 10px; }
+    .profile-highlights { margin: 18px 0 16px; gap: 18px; padding:0 16px; }
+    .hl-ring { width: 62px; height: 62px; }
+    .profile-tabs { width:100%; gap:0; border-top:1px solid var(--border); }
+    .pf-tab { flex:1; width:auto; padding: 11px 0 10px; border-bottom:1px solid transparent; }
+    .pf-tab svg { width:24px; height:24px; }
+    .pf-tab-label { display:none; }
+    .profile-grid { width:100%; gap:2px; }
+    .grid-cell { aspect-ratio:3/4; }
+    .profile-link { color: var(--text); }
+  }
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -1624,47 +1707,53 @@
     if (profileTab === 'reels') display = posts.filter(p => p.type === 'reel');
     if (profileTab === 'tagged') display = [];
 
-    const gridSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`;
-    const reelSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="20" height="20" rx="3"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>`;
-    const tagSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="12" cy="10" r="3"/><path d="M7 18c1-2.5 3-4 5-4s4 1.5 5 4"/></svg>`;
+    const gridSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`;
+    const reelSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3l3 5M14 3l3 5M3 8h18"/><path d="M10 12.5l5 3-5 3z"/></svg>`;
+    const tagSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="12" cy="10" r="3"/><path d="M7 18c1-2.5 3-4 5-4s4 1.5 5 4"/></svg>`;
     const addPersonSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="8" r="4"/><path d="M3 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>`;
+    const menuSvg = `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>`;
+    const bellSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>`;
+    const plusSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M12 8v8M8 12h8"/></svg>`;
 
-    const highlights = Array.from({ length: 5 }, () =>
-      `<div class="hl"><div class="hl-ring"></div><span>Highlight</span></div>`
+    const highlights = ['Work','BTS','Films','Campaigns','Team'].map(name =>
+      `<div class="hl"><div class="hl-ring"></div><span>${name}</span></div>`
     ).join('');
 
     let contentHtml = '';
     if (profileTab === 'tagged') {
-      contentHtml = `
-        <div class="tagged-empty">
-          <div class="tagged-icon">${tagSvg}</div>
-          <h3>Photos of you</h3>
-          <p>When people tag you in photos and videos, they'll appear here.</p>
-        </div>`;
+      contentHtml = `<div class="tagged-empty"><div class="tagged-icon">${tagSvg}</div><h3>Photos of you</h3><p>When people tag you in photos and videos, they'll appear here.</p></div>`;
     } else if (display.length === 0) {
-      contentHtml = `
-        <div class="empty-state" style="grid-column: 1/-1;">
-          <p>No ${profileTab === 'reels' ? 'reels' : 'posts'} yet.</p>
-        </div>`;
+      contentHtml = `<div class="empty-state" style="grid-column:1/-1;"><p>No ${profileTab === 'reels' ? 'reels' : 'posts'} yet.</p></div>`;
     } else {
       contentHtml = `<div class="profile-grid ${profileTab === 'reels' ? 'reels-grid' : ''}">${display.map(post => renderGridCell(post)).join('')}</div>`;
     }
 
     gallery.innerHTML = `
+      <div class="ig-mobile-topbar">
+        <div class="ig-handle">yourbrand</div>
+        <div class="ig-top-actions">${plusSvg}${bellSvg}${menuSvg}</div>
+      </div>
       <div class="profile-header">
         <div class="profile-top">
-          <img class="profile-avatar" src="${document.querySelector('.sheep-icon').src}" alt="Shepherd SNS Studio">
-          <div class="profile-stats">
-            <span><b>${posts.length}</b>posts</span>
-            <span><b>12.4K</b>Followers</span>
-            <span><b>388</b>Following</span>
+          <div class="profile-avatar-wrap"><img class="profile-avatar" src="${document.querySelector('.sheep-icon').src}" alt="Your Brand"></div>
+          <div class="profile-main">
+            <div class="profile-title-row">
+              <span class="profile-handle">yourbrand</span>
+              <div class="profile-title-actions">
+                <button class="pf-btn pf-btn-dark">Follow</button>
+                <button class="pf-btn pf-btn-light">Message</button>
+              </div>
+              <button class="profile-menu-btn" aria-label="More options">${menuSvg}</button>
+            </div>
+            <div class="profile-stats">
+              <span><b>${posts.length}</b> posts</span>
+              <span><b>12.4K</b> followers</span>
+              <span><b>388</b> following</span>
+            </div>
+            <div class="profile-bio desktop-bio"><b>Your Brand</b><br>Creative studio ✨ New drops every week<br><span class="profile-link">yourbrand.com</span></div>
           </div>
         </div>
-        <div class="profile-bio">
-          <b>Your Brand</b><br>
-          Creative studio ✨ New drops every week<br>
-          <span class="profile-link">yourbrand.com</span>
-        </div>
+        <div class="profile-bio mobile-bio"><b>Your Brand</b><br>Creative studio ✨ New drops every week<br><span class="profile-link">yourbrand.com</span></div>
         <div class="profile-actions">
           <button class="pf-btn pf-btn-dark">Follow</button>
           <button class="pf-btn pf-btn-light">Message</button>
@@ -1672,9 +1761,9 @@
         </div>
         <div class="profile-highlights">${highlights}</div>
         <div class="profile-tabs">
-          <button class="pf-tab ${profileTab === 'posts' ? 'active' : ''}" onclick="switchProfileTab('posts')">${gridSvg}</button>
-          <button class="pf-tab ${profileTab === 'reels' ? 'active' : ''}" onclick="switchProfileTab('reels')">${reelSvg}</button>
-          <button class="pf-tab ${profileTab === 'tagged' ? 'active' : ''}" onclick="switchProfileTab('tagged')">${tagSvg}</button>
+          <button class="pf-tab ${profileTab === 'posts' ? 'active' : ''}" onclick="switchProfileTab('posts')">${gridSvg}<span class="pf-tab-label">Posts</span></button>
+          <button class="pf-tab ${profileTab === 'reels' ? 'active' : ''}" onclick="switchProfileTab('reels')">${reelSvg}<span class="pf-tab-label">Reels</span></button>
+          <button class="pf-tab ${profileTab === 'tagged' ? 'active' : ''}" onclick="switchProfileTab('tagged')">${tagSvg}<span class="pf-tab-label">Tagged</span></button>
         </div>
       </div>
       ${contentHtml}
