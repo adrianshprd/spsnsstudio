@@ -1151,6 +1151,109 @@
     .gallery { grid-template-columns: 1fr; }
     .post-card { max-width: 100%; }
   }
+
+
+  /* ===== DARK MODE + AUTH ===== */
+  html[data-theme="dark"] {
+    --bg: #0f0f10;
+    --card: #18181a;
+    --text: #f4f4f5;
+    --muted: #a1a1aa;
+    --border: #303034;
+    --accent: #c69463;
+    --accent2: #9a6739;
+  }
+  html[data-theme="dark"] .header h1 { color: var(--text); }
+  html[data-theme="dark"] .upload-zone:hover,
+  html[data-theme="dark"] .upload-zone.dragover { background: #211d19; }
+  html[data-theme="dark"] .post-card,
+  html[data-theme="dark"] .profile-shell,
+  html[data-theme="dark"] .carousel-viewer-info { background: var(--card); color: var(--text); }
+  html[data-theme="dark"] input,
+  html[data-theme="dark"] textarea { color: var(--text); background: #111113; }
+  html[data-theme="dark"] .pf-btn-light { background: #27272a; color: var(--text); border-color: var(--border); }
+
+  .theme-btn, .auth-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 38px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .theme-btn:hover, .auth-btn:hover { border-color: var(--accent); }
+  .auth-user { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+
+  .auth-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(10,10,11,.72);
+    backdrop-filter: blur(14px);
+  }
+  .auth-overlay.active { display: flex; }
+  .auth-card {
+    width: min(420px, 100%);
+    padding: 30px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--card);
+    color: var(--text);
+    box-shadow: 0 24px 80px rgba(0,0,0,.35);
+  }
+  .auth-card h2 { font-size: 24px; margin-bottom: 8px; }
+  .auth-card > p { color: var(--muted); font-size: 14px; margin-bottom: 22px; line-height: 1.45; }
+  .auth-field { margin-bottom: 14px; }
+  .auth-field label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; }
+  .auth-field input {
+    width: 100%;
+    padding: 12px 13px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+  }
+  .auth-field input:focus { border-color: var(--accent); }
+  .auth-primary {
+    width: 100%;
+    padding: 12px;
+    border: 0;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .auth-primary:disabled { opacity: .55; cursor: wait; }
+  .auth-switch { margin-top: 15px; text-align: center; font-size: 13px; color: var(--muted); }
+  .auth-switch button { border: 0; background: none; color: var(--accent); font-weight: 700; cursor: pointer; }
+  .auth-message { min-height: 20px; margin-top: 12px; font-size: 13px; line-height: 1.4; color: var(--muted); }
+  .auth-message.error { color: #ef4444; }
+  .auth-message.success { color: #22c55e; }
+  body.auth-locked #app { filter: blur(5px); pointer-events: none; user-select: none; }
+
+  /* Crop portrait photos instead of showing side bars. */
+  .carousel-viewer-media .carousel-slide img,
+  .reel-media-wrap img.reel-video { object-fit: cover !important; }
+
+  @media (max-width: 700px) {
+    .header-actions { width: 100%; }
+    .auth-user { display: none; }
+    .theme-btn, .auth-btn { padding: 8px 10px; }
+  }
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -1160,7 +1263,28 @@
   const SUPABASE_BUCKET = "post-media";
 </script>
 </head>
-<body>
+
+<body class="auth-locked">
+
+<div class="auth-overlay active" id="authOverlay" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+  <div class="auth-card">
+    <h2 id="authTitle">Sign in</h2>
+    <p id="authSubtitle">Sign in to access Shepherd SNS Studio and your Supabase posts.</p>
+    <form id="authForm" onsubmit="submitAuth(event)">
+      <div class="auth-field">
+        <label for="authEmail">Email</label>
+        <input id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com">
+      </div>
+      <div class="auth-field">
+        <label for="authPassword">Password</label>
+        <input id="authPassword" type="password" autocomplete="current-password" minlength="6" required placeholder="At least 6 characters">
+      </div>
+      <button class="auth-primary" id="authSubmit" type="submit">Sign in</button>
+    </form>
+    <div class="auth-switch"><span id="authSwitchText">No account yet?</span> <button type="button" onclick="toggleAuthMode()" id="authSwitchBtn">Create account</button></div>
+    <div class="auth-message" id="authMessage"></div>
+  </div>
+</div>
 
 <div class="insta-app" id="app">
   <div class="header">
@@ -1181,6 +1305,9 @@
         <label>Client View</label>
         <div class="switch" id="clientSwitch" onclick="toggleClientMode()"></div>
       </div>
+      <button class="theme-btn" id="themeBtn" type="button" onclick="toggleTheme()" aria-label="Toggle dark mode">🌙 Dark</button>
+      <span class="auth-user" id="authUser"></span>
+      <button class="auth-btn" id="signOutBtn" type="button" onclick="signOutUser()" style="display:none">Sign out</button>
     </div>
   </div>
 
@@ -1292,9 +1419,49 @@
       .replace(/^-+|-+$/g, '') || 'upload';
   }
 
+  async function createVideoThumbnail(file) {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      const objectUrl = URL.createObjectURL(file);
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+
+      const cleanup = () => URL.revokeObjectURL(objectUrl);
+      const fail = () => { cleanup(); resolve(null); };
+
+      video.onerror = fail;
+      video.onloadedmetadata = () => {
+        const target = Number.isFinite(video.duration) && video.duration > 0
+          ? Math.min(0.35, Math.max(0.05, video.duration * 0.08))
+          : 0.1;
+        try { video.currentTime = target; } catch (_) { fail(); }
+      };
+      video.onseeked = () => {
+        try {
+          const maxWidth = 720;
+          const scale = Math.min(1, maxWidth / Math.max(1, video.videoWidth));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+          canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+          canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => {
+            cleanup();
+            if (!blob) return resolve(null);
+            resolve(new File([blob], `thumbnail-${Date.now()}.jpg`, { type: 'image/jpeg' }));
+          }, 'image/jpeg', 0.82);
+        } catch (_) { fail(); }
+      };
+      video.src = objectUrl;
+    });
+  }
+
   async function uploadMediaFile(file) {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) throw new Error('Please sign in before uploading.');
+
     const uniqueName = `${Date.now()}-${crypto.randomUUID()}-${safeFileName(file.name)}`;
-    const path = `posts/${uniqueName}`;
+    const path = `${user.id}/posts/${uniqueName}`;
 
     const { data, error } = await supabaseClient.storage
       .from(SUPABASE_BUCKET)
@@ -1310,9 +1477,37 @@
       .from(SUPABASE_BUCKET)
       .getPublicUrl(data.path);
 
+    let thumbnailUrl = null;
+    let thumbnailPath = null;
+    if (file.type.startsWith('video/')) {
+      const thumbnailFile = await createVideoThumbnail(file);
+      if (thumbnailFile) {
+        thumbnailPath = `${user.id}/thumbnails/${Date.now()}-${crypto.randomUUID()}.jpg`;
+        const { data: thumbData, error: thumbError } = await supabaseClient.storage
+          .from(SUPABASE_BUCKET)
+          .upload(thumbnailPath, thumbnailFile, {
+            cacheControl: '3600',
+            contentType: 'image/jpeg',
+            upsert: false
+          });
+        if (!thumbError) {
+          const { data: thumbPublic } = supabaseClient.storage
+            .from(SUPABASE_BUCKET)
+            .getPublicUrl(thumbData.path);
+          thumbnailUrl = thumbPublic.publicUrl;
+          thumbnailPath = thumbData.path;
+        } else {
+          console.warn('Thumbnail upload failed:', thumbError);
+          thumbnailPath = null;
+        }
+      }
+    }
+
     return {
       url: publicData.publicUrl,
       path: data.path,
+      thumbnailUrl,
+      thumbnailPath,
       mediaType: file.type.startsWith('video/') ? 'video' : 'image'
     };
   }
@@ -1320,9 +1515,11 @@
   function getPostStoragePaths(post) {
     const paths = [];
     if (post.storagePath) paths.push(post.storagePath);
+    if (post.thumbnailStoragePath) paths.push(post.thumbnailStoragePath);
     if (Array.isArray(post.slides)) {
       post.slides.forEach(slide => {
         if (slide && slide.storagePath) paths.push(slide.storagePath);
+        if (slide && slide.thumbnailPath) paths.push(slide.thumbnailPath);
       });
     }
     return paths;
@@ -1490,9 +1687,12 @@
 
     if (post.type === 'reel') {
       const hasVideo = post.videoUrl && post.videoUrl !== '';
-      media = hasVideo
-        ? `<video src="${post.videoUrl}" muted playsinline preload="metadata"></video>`
-        : `<img src="${post.thumbnail}" alt="reel" loading="lazy">`;
+      const hasRealThumbnail = post.thumbnail && post.thumbnail !== post.videoUrl;
+      media = hasRealThumbnail
+        ? `<img src="${post.thumbnail}" alt="reel thumbnail" loading="lazy">`
+        : (hasVideo
+          ? `<video src="${post.videoUrl}" muted playsinline preload="auto" onloadeddata="primeVideoPreview(this)"></video>`
+          : `<img src="${post.thumbnail}" alt="reel" loading="lazy">`);
       badge = `
         <div class="grid-views">
           <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -2459,7 +2659,8 @@
           type: 'reel',
           username: 'yourbrand',
           avatar: 'YB',
-          thumbnail: videos[0].url,
+          thumbnail: videos[0].thumbnailUrl || videos[0].url,
+          thumbnailStoragePath: videos[0].thumbnailPath || null,
           videoUrl: videos[0].url,
           storagePath: videos[0].path,
           caption: '',
@@ -2471,7 +2672,9 @@
         const allSlides = items.map(item => ({
           url: item.url,
           type: item.mediaType,
-          storagePath: item.path
+          storagePath: item.path,
+          thumbnailUrl: item.thumbnailUrl || null,
+          thumbnailPath: item.thumbnailPath || null
         }));
 
         if (allSlides.length > 0) {
@@ -2514,9 +2717,135 @@
     if (e.key === 'Escape') closeViewer();
   });
 
+  // ===== THEME =====
+  function applyTheme(theme) {
+    const resolved = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = resolved;
+    localStorage.setItem('sns_theme', resolved);
+    const button = document.getElementById('themeBtn');
+    if (button) button.textContent = resolved === 'dark' ? '☀️ Light' : '🌙 Dark';
+  }
+
+  function toggleTheme() {
+    applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+  }
+
+  function initializeTheme() {
+    const saved = localStorage.getItem('sns_theme');
+    const preferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    applyTheme(saved || preferred);
+  }
+
+  // ===== SUPABASE AUTH =====
+  let authMode = 'login';
+  let appBooted = false;
+
+  function setAuthMessage(message, type = '') {
+    const el = document.getElementById('authMessage');
+    el.textContent = message || '';
+    el.className = `auth-message ${type}`.trim();
+  }
+
+  function toggleAuthMode() {
+    authMode = authMode === 'login' ? 'signup' : 'login';
+    document.getElementById('authTitle').textContent = authMode === 'login' ? 'Sign in' : 'Create account';
+    document.getElementById('authSubtitle').textContent = authMode === 'login'
+      ? 'Sign in to access Shepherd SNS Studio and your Supabase posts.'
+      : 'Create an account using your email and a password.';
+    document.getElementById('authSubmit').textContent = authMode === 'login' ? 'Sign in' : 'Create account';
+    document.getElementById('authSwitchText').textContent = authMode === 'login' ? 'No account yet?' : 'Already registered?';
+    document.getElementById('authSwitchBtn').textContent = authMode === 'login' ? 'Create account' : 'Sign in';
+    document.getElementById('authPassword').autocomplete = authMode === 'login' ? 'current-password' : 'new-password';
+    setAuthMessage('');
+  }
+
+  async function submitAuth(event) {
+    event.preventDefault();
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    const submit = document.getElementById('authSubmit');
+    submit.disabled = true;
+    setAuthMessage(authMode === 'login' ? 'Signing in…' : 'Creating account…');
+
+    try {
+      if (authMode === 'signup') {
+        const { data, error } = await supabaseClient.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin }
+        });
+        if (error) throw error;
+        if (!data.session) {
+          setAuthMessage('Account created. Check your email and confirm the account, then sign in.', 'success');
+          return;
+        }
+      } else {
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch (error) {
+      setAuthMessage(error.message || String(error), 'error');
+    } finally {
+      submit.disabled = false;
+    }
+  }
+
+  async function signOutUser() {
+    await supabaseClient.auth.signOut();
+  }
+
+  async function applyAuthSession(session) {
+    const overlay = document.getElementById('authOverlay');
+    const signOut = document.getElementById('signOutBtn');
+    const authUser = document.getElementById('authUser');
+
+    if (!session?.user) {
+      document.body.classList.add('auth-locked');
+      overlay.classList.add('active');
+      signOut.style.display = 'none';
+      authUser.textContent = '';
+      posts = [];
+      const gallery = document.getElementById('gallery');
+      if (gallery) gallery.innerHTML = '';
+      appBooted = false;
+      return;
+    }
+
+    document.body.classList.remove('auth-locked');
+    overlay.classList.remove('active');
+    signOut.style.display = 'inline-flex';
+    authUser.textContent = session.user.email || 'Signed in';
+    setAuthMessage('');
+
+    if (!appBooted) {
+      posts = await loadPosts();
+      renderGallery();
+      appBooted = true;
+    }
+  }
+
+  function primeVideoPreview(video) {
+    try {
+      video.muted = true;
+      const seek = () => {
+        if (Number.isFinite(video.duration) && video.duration > 0) {
+          video.currentTime = Math.min(0.25, video.duration * 0.08);
+        }
+        video.pause();
+      };
+      if (video.readyState >= 2) seek();
+      else video.addEventListener('loadeddata', seek, { once: true });
+    } catch (_) {}
+  }
+
   async function initializeApp() {
-    posts = await loadPosts();
-    renderGallery();
+    initializeTheme();
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    await applyAuthSession(session);
+
+    supabaseClient.auth.onAuthStateChange((_event, nextSession) => {
+      setTimeout(() => applyAuthSession(nextSession), 0);
+    });
   }
 
   initializeApp();
