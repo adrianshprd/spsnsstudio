@@ -1412,8 +1412,7 @@
   @media (max-width:735px) {
     .shepherd-theme-toggle { width:36px; height:36px; min-height:36px; }
     .theme-icon { width:20px; height:20px; }
-    .client-back-btn { top:10px; left:10px; width:38px; height:38px; min-height:38px; padding:0; justify-content:center; }
-    .client-back-btn span { display:none; }
+    .client-view .client-back-btn { display:none; }
     .post-viewer { padding:0; }
     .carousel-viewer, .reel-viewer { border-radius:0; }
   }
@@ -1660,6 +1659,11 @@
     <div class="auth-message" id="authMessage"></div>
   </div>
 </div>
+
+<button class="client-back-btn" id="clientBackBtn" type="button" onclick="exitClientView()" aria-label="Back to Studio View">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+  <span>Back to Studio</span>
+</button>
 
 <div class="insta-app" id="app">
   <div class="header">
@@ -3490,7 +3494,7 @@
     throwIfUploadCancelled(signal);
   }
 
-  async function createVideoThumbnail(file, signal = currentUploadController?.signal) {
+  async function createVideoThumbnail(file, signal = currentUploadController?.signal, mode = 'smart') {
     const video = document.createElement('video');
     const objectUrl = URL.createObjectURL(file);
     video.muted = true;
@@ -3510,7 +3514,11 @@
       if (!video.videoWidth || !video.videoHeight) throw new Error('This video cannot be decoded for a thumbnail.');
 
       const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
-      const rawTargets = [.35, .75, 1.25, duration * .08, duration * .2, duration * .42, duration * .65];
+      // Carousel covers favour speed: decode one frame only. Reels keep the smarter
+      // multi-frame scan so a fade-in or black opening is less likely to become the cover.
+      const rawTargets = mode === 'fast'
+        ? [Math.min(.75, Math.max(.08, duration * .08))]
+        : [.35, .75, 1.25, duration * .08, duration * .2, duration * .42, duration * .65];
       const targets = [...new Set(rawTargets.map(value => Math.max(.04, Math.min(Math.max(.04, duration - .04), value)).toFixed(3)))].map(Number);
       let fallbackBlob = null;
 
@@ -3547,7 +3555,7 @@
   }
 
   async function uploadMediaFile(file, onStatus, options = {}) {
-    const { generateThumbnail = true, signal = currentUploadController?.signal, onPath } = options;
+    const { generateThumbnail = true, thumbnailMode = 'smart', signal = currentUploadController?.signal, onPath } = options;
     throwIfUploadCancelled(signal);
     const { data: { session } } = await supabaseClient.auth.getSession();
     const user = session?.user;
@@ -3565,12 +3573,13 @@
     let thumbnailPath = null;
     if (generateThumbnail && file.type.startsWith('video/')) {
       onStatus?.({ phase: 'thumbnail', file });
-      const thumbnailFile = await createVideoThumbnail(file, signal);
+      const thumbnailFile = await createVideoThumbnail(file, signal, thumbnailMode);
       throwIfUploadCancelled(signal);
       if (thumbnailFile) {
         thumbnailPath = `${user.id}/thumbnails/${Date.now()}-${crypto.randomUUID()}.jpg`;
         try {
-          await uploadBinaryToSupabase(thumbnailPath, thumbnailFile, null, signal);
+          onStatus?.({ phase: 'thumbnailUpload', file, thumbnailFile });
+          await uploadBinaryToSupabase(thumbnailPath, thumbnailFile, (loaded, total) => onStatus?.({ phase: 'thumbnailUpload', loaded, total, file, thumbnailFile }), signal);
           onPath?.(thumbnailPath);
           const { data: thumbPublic } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(thumbnailPath);
           thumbnailUrl = thumbPublic.publicUrl;
@@ -3615,17 +3624,22 @@
         const file = fileArray[i];
         // A Reel needs a cover. A carousel only needs a generated cover when slide 1 is a video.
         const generateThumbnail = file.type.startsWith('video/') && (isSingleVideoReel || i === 0);
+        const thumbnailMode = isSingleVideoReel ? 'smart' : 'fast';
         const item = await uploadMediaFile(file, status => {
           if (status.phase === 'upload') {
             const withinFile = Math.max(0, Math.min(1, (status.loaded || 0) / Math.max(1, status.total || file.size || 1)));
             const percent = 5 + ((i + withinFile * .9) / fileArray.length) * 88;
             setUploadProgress(percent, `Uploading media ${i + 1} of ${fileArray.length}…`, file.name);
           } else if (status.phase === 'thumbnail') {
-            const percent = 5 + ((i + .94) / fileArray.length) * 88;
-            setUploadProgress(percent, isSingleVideoReel ? 'Generating Reel cover…' : 'Generating carousel cover…', file.name);
+            const percent = 5 + ((i + .92) / fileArray.length) * 88;
+            setUploadProgress(percent, isSingleVideoReel ? 'Finding the best Reel cover…' : 'Generating carousel cover from Slide 1…', file.name);
+          } else if (status.phase === 'thumbnailUpload') {
+            const percent = 5 + ((i + .97) / fileArray.length) * 88;
+            setUploadProgress(percent, isSingleVideoReel ? 'Uploading Reel cover…' : 'Uploading carousel cover…', file.name);
           }
         }, {
           generateThumbnail,
+          thumbnailMode,
           signal,
           onPath: path => createdPaths.push(path)
         });
