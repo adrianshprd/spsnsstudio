@@ -1387,7 +1387,7 @@
   }
 
   .client-back-btn { display:none; align-items:center; gap:8px; position:fixed; z-index:1200; top:14px; left:16px; min-height:38px; padding:8px 12px; border:1px solid var(--border); border-radius:999px; background:color-mix(in srgb, var(--card) 92%, transparent); color:var(--text); font:600 13px/1 system-ui,-apple-system,sans-serif; cursor:pointer; box-shadow:0 4px 18px rgba(0,0,0,.08); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
-  .client-view .client-back-btn { display:inline-flex; }
+  .client-back-btn.is-visible { display:inline-flex; }
   .client-back-btn svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
   .client-back-btn:hover { background:var(--card); transform:translateY(-1px); }
   .client-back-btn:focus-visible { outline:2px solid var(--ig-blue); outline-offset:2px; }
@@ -1414,7 +1414,7 @@
   @media (max-width:735px) {
     .shepherd-theme-toggle { width:36px; height:36px; min-height:36px; }
     .theme-icon { width:20px; height:20px; }
-    .client-view .client-back-btn { display:none; }
+    .client-back-btn.is-visible { display:none; }
     .post-viewer { padding:0; }
     .carousel-viewer, .reel-viewer { border-radius:0; }
   }
@@ -2890,6 +2890,11 @@
     if (switchEl) switchEl.classList.toggle('on', clientMode);
     const app = document.getElementById('app');
     if (app) app.classList.toggle('client-view', clientMode);
+    const backButton = document.getElementById('clientBackBtn');
+    if (backButton) {
+      backButton.classList.toggle('is-visible', clientMode);
+      backButton.setAttribute('aria-hidden', clientMode ? 'false' : 'true');
+    }
     renderGallery();
   }
 
@@ -4312,6 +4317,11 @@
     const app = document.getElementById('app');
     app?.classList.toggle('client-view', clientMode);
     app?.classList.remove('client-nav-hidden');
+    const backButton = document.getElementById('clientBackBtn');
+    if (backButton) {
+      backButton.classList.toggle('is-visible', clientMode);
+      backButton.setAttribute('aria-hidden', clientMode ? 'false' : 'true');
+    }
     clientNavLastY = window.scrollY || 0;
     renderGallery();
   }
