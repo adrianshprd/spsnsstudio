@@ -1524,6 +1524,103 @@
     .viewer-neighbour-hint { display:none; }
   }
 
+  /* ===== MOBILE WIDTH CONTAINMENT =====
+   * Keep profile rows, horizontal highlights and the full-screen viewer inside
+   * the visual viewport. Grid items default to min-width:auto, which allowed
+   * the highlight row's full content width to widen the entire page on phones.
+   */
+  html, body { max-width:100%; overflow-x:hidden; }
+  @supports (overflow:clip) {
+    html, body { overflow-x:clip; }
+  }
+  @media (max-width:735px) {
+    .insta-app.client-view {
+      width:100%;
+      max-width:100%;
+      min-width:0;
+      margin:0;
+      padding:0;
+      overflow-x:hidden;
+    }
+    .client-view .main-content,
+    .client-view #gallery,
+    .client-view .profile-shell {
+      width:100%;
+      max-width:100%;
+      min-width:0;
+      margin-left:0;
+      margin-right:0;
+    }
+    .client-view #gallery {
+      grid-template-columns:minmax(0,1fr);
+      overflow-x:hidden;
+    }
+    .client-view #gallery > *,
+    .ig-mobile-topbar,
+    .profile-header,
+    .profile-top,
+    .profile-avatar-wrap,
+    .profile-main,
+    .profile-stats,
+    .profile-bio,
+    .profile-actions,
+    .profile-highlights,
+    .profile-tabs,
+    .profile-grid {
+      min-width:0;
+      max-width:100%;
+    }
+    .ig-mobile-topbar { width:100%; }
+    .ig-mobile-topbar .ig-handle {
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .profile-stats span {
+      flex:1 1 0;
+      min-width:0;
+      white-space:normal;
+    }
+    .profile-actions { width:auto; }
+    .profile-highlights {
+      width:100%;
+      overflow-x:auto;
+      overflow-y:hidden;
+      overscroll-behavior-x:contain;
+      -webkit-overflow-scrolling:touch;
+    }
+    .profile-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .profile-bio,
+    .carousel-viewer-caption,
+    .reel-caption-text { overflow-wrap:anywhere; }
+
+    .post-viewer,
+    .post-viewer-inner.viewer-feed,
+    .viewer-feed-item {
+      width:100%;
+      max-width:100%;
+      min-width:0;
+    }
+    .post-viewer,
+    .post-viewer-inner.viewer-feed { height:100%; height:100dvh; }
+    .viewer-feed-item { overflow:hidden; }
+    .viewer-feed-item .carousel-viewer,
+    .viewer-feed-item .reel-viewer {
+      width:100%;
+      max-width:100%;
+      min-width:0;
+    }
+    .carousel-viewer-header,
+    .carousel-viewer-media,
+    .carousel-viewer-actions,
+    .carousel-viewer-caption,
+    .carousel-viewer-comments,
+    .carousel-viewer-input,
+    .reel-topbar,
+    .reel-left-info { min-width:0; max-width:100%; }
+  }
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
