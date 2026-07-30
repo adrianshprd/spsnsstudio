@@ -1122,7 +1122,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0,0,0,0.2);
+    /* This full-size layer stays active while a carousel video is playing so
+       the user can tap anywhere to pause it. It must remain transparent;
+       otherwise its previous 20% black fill darkened only opened carousel
+       videos while the same asset looked correct in Reels. */
+    background: transparent;
     cursor: pointer;
     z-index: 4;
   }
@@ -1646,6 +1650,9 @@
     filter: none !important;
     -webkit-filter: none !important;
     mix-blend-mode: normal !important;
+  }
+  .carousel-viewer-media .carousel-video-play {
+    background: transparent !important;
   }
 
   /* Render carousel artwork on the normal page-compositing path. Some browsers
