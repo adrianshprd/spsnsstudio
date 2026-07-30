@@ -1418,6 +1418,112 @@
     .carousel-viewer, .reel-viewer { border-radius:0; }
   }
 
+
+  /* ===== PHASE A.2 — UPLOAD, VIEWER FEED & RELIABILITY ===== */
+  .upload-zone.uploading { cursor: progress; border-style: solid; }
+  .upload-zone.uploading > svg,
+  .upload-zone.uploading > p { opacity: .28; }
+  .upload-progress {
+    display: none;
+    width: min(560px, 100%);
+    margin: 18px auto 0;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--card) 92%, transparent);
+    text-align: left;
+  }
+  .upload-zone.uploading .upload-progress { display: block; }
+  .upload-progress-copy { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:13px; color:var(--text); }
+  .upload-progress-copy strong { font-variant-numeric:tabular-nums; font-size:12px; }
+  .upload-progress-track { height:6px; margin-top:10px; overflow:hidden; border-radius:999px; background:var(--border); }
+  .upload-progress-fill { width:0%; height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width .18s ease; }
+  .upload-progress-file { min-height:16px; margin-top:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font-size:11px; }
+
+  .creator-delete-btn {
+    width:32px; height:32px; padding:0; margin-left:2px; display:inline-flex; align-items:center; justify-content:center;
+    border:1px solid var(--border); border-radius:999px; background:var(--card); color:var(--muted); cursor:pointer;
+    transition:background .18s ease,color .18s ease,border-color .18s ease,transform .18s ease;
+  }
+  .creator-delete-btn svg { width:16px; height:16px; }
+  .creator-delete-btn:hover { color:#fff; background:#ed4956; border-color:#ed4956; transform:scale(1.04); }
+  .post-header .header-more-btn { margin-left:0; }
+
+  .grid-cell { background:var(--border); }
+  .grid-cell::before {
+    content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background:linear-gradient(100deg,var(--border) 20%,color-mix(in srgb,var(--card) 70%,var(--border)) 40%,var(--border) 60%);
+    background-size:220% 100%; animation:gridSkeleton 1.25s linear infinite; opacity:1; transition:opacity .2s ease;
+  }
+  .grid-cell.media-loaded::before { opacity:0; }
+  .grid-cell > img,.grid-cell > video,.grid-cell > .video-thumb-placeholder { position:relative; z-index:1; }
+  .video-thumb-placeholder { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:linear-gradient(145deg,#161616,#323232); color:#fff; font-size:11px; }
+  .video-thumb-placeholder svg { width:28px; height:28px; }
+  @keyframes gridSkeleton { to { background-position:-220% 0; } }
+
+  .post-viewer { opacity:0; pointer-events:none; transition:opacity .2s ease; }
+  .post-viewer.active { display:block; opacity:1; pointer-events:auto; }
+  .post-viewer.preparing { opacity:0; }
+  .post-viewer.is-closing { opacity:0; pointer-events:none; }
+  .post-viewer-inner.viewer-feed {
+    width:100%; height:100%; max-width:none; max-height:none; display:block; overflow-y:auto; overflow-x:hidden;
+    scroll-snap-type:y mandatory; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  .post-viewer-inner.viewer-feed::-webkit-scrollbar { display:none; }
+  .viewer-feed-item {
+    min-height:100%; width:100%; display:flex; align-items:center; justify-content:center; position:relative;
+    padding:5vh 24px; scroll-snap-align:start; scroll-snap-stop:always;
+  }
+  .viewer-feed-item .carousel-viewer,
+  .viewer-feed-item .reel-viewer { flex:0 0 auto; }
+  .viewer-feed-position {
+    position:absolute; right:12px; top:50%; transform:translateY(-50%); z-index:60; color:rgba(255,255,255,.7);
+    font-size:10px; font-variant-numeric:tabular-nums; text-shadow:0 1px 4px rgba(0,0,0,.7); pointer-events:none;
+  }
+  .viewer-transition-target { transition:opacity .12s ease; }
+  .viewer-transition-clone {
+    position:fixed; z-index:10050; margin:0; padding:0; overflow:hidden; pointer-events:none; background:#000;
+    object-fit:cover; box-shadow:0 18px 60px rgba(0,0,0,.35);
+    transition:top .28s cubic-bezier(.2,.78,.2,1),left .28s cubic-bezier(.2,.78,.2,1),width .28s cubic-bezier(.2,.78,.2,1),height .28s cubic-bezier(.2,.78,.2,1),border-radius .28s ease,opacity .16s ease;
+  }
+  .viewer-neighbour-hint {
+    position:fixed; left:50%; bottom:12px; transform:translateX(-50%); z-index:10020; padding:6px 10px; border-radius:999px;
+    color:rgba(255,255,255,.72); background:rgba(0,0,0,.28); backdrop-filter:blur(8px); font-size:10px; pointer-events:none;
+    opacity:0; animation:viewerHint 2.1s ease .45s both;
+  }
+  @keyframes viewerHint { 0%{opacity:0;transform:translate(-50%,6px)} 20%,70%{opacity:1;transform:translate(-50%,0)} 100%{opacity:0} }
+
+  /* Global audio state is represented consistently on every video slide. */
+  .carousel-video-mute,.reel-viewer-mute { transition:transform .16s ease,background .16s ease; }
+  .carousel-video-mute:active,.reel-viewer-mute:active { transform:scale(.92); }
+
+  /* Client utility bars hide while scrolling down and return on pull-down/up-scroll. */
+  .client-view .header,
+  .client-view .ig-mobile-topbar,
+  .client-view .client-back-btn { transition:transform .24s cubic-bezier(.2,.75,.3,1),opacity .2s ease; will-change:transform; }
+  .client-view .header { position:sticky; top:0; z-index:40; background:color-mix(in srgb,var(--bg) 92%,transparent); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+  .client-view.client-nav-hidden .header,
+  .client-view.client-nav-hidden .ig-mobile-topbar { transform:translateY(calc(-100% - 8px)); }
+  .client-view.client-nav-hidden .client-back-btn { transform:translateY(-70px); opacity:0; }
+
+  @media (min-width:736px) {
+    .post-viewer-inner.viewer-feed { width:100%; height:100%; max-height:none; display:block; }
+    .viewer-feed-item .carousel-viewer { width:min(470px,calc(100vw - 48px)); height:min(820px,90vh); }
+    .viewer-feed-item .reel-viewer { width:min(430px,calc(100vw - 48px)); height:min(820px,90vh); }
+  }
+  @media (max-width:735px) {
+    .viewer-feed-item { min-height:100dvh; padding:0; align-items:flex-start; }
+    .viewer-feed-item .carousel-viewer,.viewer-feed-item .reel-viewer { width:100%; min-height:100dvh; height:100dvh; border-radius:0; }
+    .viewer-feed-position { right:8px; top:52px; transform:none; }
+    .viewer-neighbour-hint { bottom:8px; }
+    .client-view .header { top:0; }
+  }
+
+  @media (prefers-reduced-motion:reduce) {
+    .viewer-transition-clone,.post-viewer,.client-view .header,.client-view .ig-mobile-topbar,.client-view .client-back-btn { transition:none!important; }
+    .viewer-neighbour-hint { display:none; }
+  }
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -1495,7 +1601,7 @@
     </div>
   </div>
 
-  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+  <div class="upload-zone" id="uploadZone" onclick="if (!uploadInProgress) document.getElementById('fileInput').click()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
       <polyline points="17 8 12 3 7 8"/>
@@ -1504,6 +1610,14 @@
     <p><strong>Click to upload</strong> or drag & drop</p>
     <p class="hint">Images & Videos for Carousel &bull; Videos for Reels &bull; Mixed media = auto Carousel</p>
     <input type="file" id="fileInput" multiple accept="image/*,video/*" style="display:none" onchange="handleFiles(this.files)">
+    <div class="upload-progress" id="uploadProgress" aria-live="polite" aria-hidden="true">
+      <div class="upload-progress-copy">
+        <span id="uploadStage">Preparing upload…</span>
+        <strong id="uploadPercent">0%</strong>
+      </div>
+      <div class="upload-progress-track"><div class="upload-progress-fill" id="uploadProgressFill"></div></div>
+      <div class="upload-progress-file" id="uploadProgressFile"></div>
+    </div>
   </div>
 
   <div class="tabs">
@@ -3022,6 +3136,980 @@
       else video.addEventListener('loadeddata', seek, { once: true });
     } catch (_) {}
   }
+
+
+
+  /* ============================================================
+   * PHASE A.2 OVERRIDES
+   * High-fidelity client browsing, shared audio, resilient uploads,
+   * live cross-device refresh and thumbnail repair.
+   * ============================================================ */
+  let globalMuted = false; // A direct tap into a post starts with audio on.
+  let uploadInProgress = false;
+  let viewerScrollRaf = 0;
+  let viewerScrollHandler = null;
+  let viewerClosing = false;
+  let viewerOpenSource = null;
+  let realtimeChannel = null;
+  let cloudRefreshTimer = 0;
+  let clientNavLastY = 0;
+  let clientTouchStartY = 0;
+  let thumbnailRepairing = new Set();
+  let ghostChecks = new Set();
+
+  function soundIconSvg(muted) {
+    return muted
+      ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>`
+      : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+  }
+
+  function trashIconSvg() {
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>`;
+  }
+
+  function isRenderablePost(post) {
+    if (!post || !post.id || !post.type) return false;
+    if (post.type === 'reel') return Boolean(post.videoUrl || post.thumbnail);
+    if (post.type === 'carousel') {
+      return Array.isArray(post.slides) && post.slides.some(slide => {
+        const url = typeof slide === 'object' ? slide?.url : slide;
+        return Boolean(url);
+      });
+    }
+    return false;
+  }
+
+  async function loadPosts(options = {}) {
+    if (Array.isArray(window.__EXPORTED_POSTS__)) {
+      const exported = window.__EXPORTED_POSTS__.filter(isRenderablePost);
+      nextId = exported.reduce((max, post) => Math.max(max, Number(post.id) || 0), 0) + 1;
+      return exported;
+    }
+
+    const { data, error } = await supabaseClient
+      .from('sns_posts')
+      .select('id, data')
+      .order('id', { ascending: false });
+
+    if (error) {
+      console.error('loadPosts failed:', error);
+      if (!options.silent) alert('Could not load posts from Supabase: ' + error.message);
+      return options.keepCurrent ? posts : [...demoPosts];
+    }
+
+    const saved = (data || []).map(row => row.data).filter(isRenderablePost);
+    if (saved.length > 0) {
+      nextId = saved.reduce((max, post) => Math.max(max, Number(post.id) || 0), 0) + 1;
+      return saved;
+    }
+    return [...demoPosts];
+  }
+
+  function renderGallerySkeleton() {
+    const gallery = document.getElementById('gallery');
+    if (!gallery) return;
+    gallery.innerHTML = Array.from({ length: 6 }, () => `
+      <div class="post-card" aria-hidden="true" style="min-height:420px;overflow:hidden;">
+        <div style="height:54px;background:var(--card);border-bottom:1px solid var(--border);"></div>
+        <div style="aspect-ratio:4/5;background:linear-gradient(100deg,var(--border) 20%,var(--card) 40%,var(--border) 60%);background-size:220% 100%;animation:gridSkeleton 1.25s linear infinite;"></div>
+      </div>`).join('');
+  }
+
+  function setUploadProgress(percent, stage, fileName = '') {
+    const progress = Math.max(0, Math.min(100, Math.round(percent || 0)));
+    const panel = document.getElementById('uploadProgress');
+    const fill = document.getElementById('uploadProgressFill');
+    const pct = document.getElementById('uploadPercent');
+    const stageEl = document.getElementById('uploadStage');
+    const fileEl = document.getElementById('uploadProgressFile');
+    if (panel) panel.setAttribute('aria-hidden', uploadInProgress ? 'false' : 'true');
+    if (fill) fill.style.width = `${progress}%`;
+    if (pct) pct.textContent = `${progress}%`;
+    if (stageEl && stage) stageEl.textContent = stage;
+    if (fileEl) fileEl.textContent = fileName || '';
+  }
+
+  function resetUploadProgress() {
+    const zone = document.getElementById('uploadZone');
+    const input = document.getElementById('fileInput');
+    uploadInProgress = false;
+    zone?.classList.remove('uploading', 'dragover');
+    if (input) { input.disabled = false; input.value = ''; }
+    setUploadProgress(0, 'Preparing upload…', '');
+  }
+
+  function encodedStoragePath(path) {
+    return String(path).split('/').map(encodeURIComponent).join('/');
+  }
+
+  async function uploadBinaryToSupabase(path, file, onProgress) {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session?.access_token) throw new Error('Please sign in before uploading.');
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const url = `${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(SUPABASE_BUCKET)}/${encodedStoragePath(path)}`;
+      xhr.open('POST', url, true);
+      xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
+      xhr.setRequestHeader('apikey', SUPABASE_KEY);
+      xhr.setRequestHeader('x-upsert', 'false');
+      xhr.setRequestHeader('cache-control', '3600');
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.upload.onprogress = event => {
+        if (event.lengthComputable && typeof onProgress === 'function') onProgress(event.loaded, event.total);
+      };
+      xhr.onerror = () => reject(new Error('Network error while uploading.'));
+      xhr.onabort = () => reject(new Error('Upload cancelled.'));
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) return resolve(path);
+        let message = `Upload failed (${xhr.status}).`;
+        try {
+          const parsed = JSON.parse(xhr.responseText || '{}');
+          message = parsed.message || parsed.error || message;
+        } catch (_) {}
+        reject(new Error(message));
+      };
+      xhr.send(file);
+    });
+  }
+
+  function canvasLooksBlack(ctx, width, height) {
+    try {
+      const sampleW = Math.min(48, width);
+      const sampleH = Math.min(48, height);
+      const sample = document.createElement('canvas');
+      sample.width = sampleW;
+      sample.height = sampleH;
+      const sctx = sample.getContext('2d', { willReadFrequently: true });
+      sctx.drawImage(ctx.canvas, 0, 0, width, height, 0, 0, sampleW, sampleH);
+      const data = sctx.getImageData(0, 0, sampleW, sampleH).data;
+      let sum = 0, sumSq = 0, count = 0;
+      for (let i = 0; i < data.length; i += 16) {
+        const luma = data[i] * .2126 + data[i + 1] * .7152 + data[i + 2] * .0722;
+        sum += luma; sumSq += luma * luma; count++;
+      }
+      const mean = sum / Math.max(1, count);
+      const variance = sumSq / Math.max(1, count) - mean * mean;
+      return mean < 7 && variance < 18;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function waitForVideoEvent(video, eventName, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+      let timer;
+      const done = () => { clearTimeout(timer); cleanup(); resolve(); };
+      const fail = () => { clearTimeout(timer); cleanup(); reject(new Error(`Video ${eventName} failed.`)); };
+      const cleanup = () => {
+        video.removeEventListener(eventName, done);
+        video.removeEventListener('error', fail);
+      };
+      video.addEventListener(eventName, done, { once: true });
+      video.addEventListener('error', fail, { once: true });
+      timer = setTimeout(fail, timeout);
+    });
+  }
+
+  async function seekVideoForThumbnail(video, time) {
+    if (Math.abs(video.currentTime - time) < .025 && video.readyState >= 2) return;
+    const wait = waitForVideoEvent(video, 'seeked', 4500);
+    video.currentTime = time;
+    await wait;
+    if ('requestVideoFrameCallback' in video) {
+      await new Promise(resolve => video.requestVideoFrameCallback(() => resolve()));
+    } else {
+      await new Promise(resolve => setTimeout(resolve, 90));
+    }
+  }
+
+  async function createVideoThumbnail(file) {
+    const video = document.createElement('video');
+    const objectUrl = URL.createObjectURL(file);
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;top:-10px;';
+    document.body.appendChild(video);
+
+    try {
+      const metadataReady = waitForVideoEvent(video, 'loadedmetadata', 7000);
+      video.src = objectUrl;
+      video.load();
+      await metadataReady;
+      if (video.readyState < 2) await waitForVideoEvent(video, 'loadeddata', 7000);
+      if (!video.videoWidth || !video.videoHeight) throw new Error('This video cannot be decoded for a thumbnail.');
+
+      const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
+      const rawTargets = [.35, .75, 1.25, duration * .08, duration * .2, duration * .42, duration * .65];
+      const targets = [...new Set(rawTargets.map(value => Math.max(.04, Math.min(Math.max(.04, duration - .04), value)).toFixed(3)))].map(Number);
+      let fallbackBlob = null;
+
+      for (let i = 0; i < targets.length; i++) {
+        await seekVideoForThumbnail(video, targets[i]);
+        const maxWidth = 900;
+        const scale = Math.min(1, maxWidth / Math.max(1, video.videoWidth));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+        canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+        const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .86));
+        if (!blob) continue;
+        fallbackBlob = fallbackBlob || blob;
+        if (!canvasLooksBlack(ctx, canvas.width, canvas.height)) {
+          return new File([blob], `thumbnail-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        }
+      }
+
+      return fallbackBlob ? new File([fallbackBlob], `thumbnail-${Date.now()}.jpg`, { type: 'image/jpeg' }) : null;
+    } catch (error) {
+      console.warn('Thumbnail generation failed:', error);
+      return null;
+    } finally {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      video.remove();
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
+
+  async function uploadMediaFile(file, onStatus) {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    const user = session?.user;
+    if (!user) throw new Error('Please sign in before uploading.');
+
+    const uniqueName = `${Date.now()}-${crypto.randomUUID()}-${safeFileName(file.name)}`;
+    const path = `${user.id}/posts/${uniqueName}`;
+    onStatus?.({ phase: 'upload', loaded: 0, total: file.size, file });
+    await uploadBinaryToSupabase(path, file, (loaded, total) => onStatus?.({ phase: 'upload', loaded, total, file }));
+    const { data: publicData } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
+
+    let thumbnailUrl = null;
+    let thumbnailPath = null;
+    if (file.type.startsWith('video/')) {
+      onStatus?.({ phase: 'thumbnail', file });
+      const thumbnailFile = await createVideoThumbnail(file);
+      if (thumbnailFile) {
+        thumbnailPath = `${user.id}/thumbnails/${Date.now()}-${crypto.randomUUID()}.jpg`;
+        try {
+          await uploadBinaryToSupabase(thumbnailPath, thumbnailFile);
+          const { data: thumbPublic } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(thumbnailPath);
+          thumbnailUrl = thumbPublic.publicUrl;
+        } catch (thumbError) {
+          console.warn('Thumbnail upload failed:', thumbError);
+          thumbnailPath = null;
+        }
+      }
+    }
+
+    return {
+      url: publicData.publicUrl,
+      path,
+      thumbnailUrl,
+      thumbnailPath,
+      mediaType: file.type.startsWith('video/') ? 'video' : 'image'
+    };
+  }
+
+  async function handleFiles(files) {
+    const fileArray = Array.from(files || []);
+    if (!fileArray.length || uploadInProgress) return;
+
+    const zone = document.getElementById('uploadZone');
+    const input = document.getElementById('fileInput');
+    const totalBytes = Math.max(1, fileArray.reduce((sum, file) => sum + Math.max(1, file.size), 0));
+    let completedBytes = 0;
+    const uploadedItems = [];
+    uploadInProgress = true;
+    zone?.classList.add('uploading', 'dragover');
+    if (input) input.disabled = true;
+    setUploadProgress(2, 'Preparing media…', `${fileArray.length} file${fileArray.length === 1 ? '' : 's'}`);
+
+    try {
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        const item = await uploadMediaFile(file, status => {
+          if (status.phase === 'upload') {
+            const withinFile = Math.max(0, Math.min(1, (status.loaded || 0) / Math.max(1, status.total || file.size || 1)));
+            const percent = 5 + ((i + withinFile * .86) / fileArray.length) * 88;
+            setUploadProgress(percent, `Uploading media ${i + 1} of ${fileArray.length}…`, file.name);
+          } else if (status.phase === 'thumbnail') {
+            const percent = 5 + ((i + .93) / fileArray.length) * 88;
+            setUploadProgress(percent, 'Generating video thumbnail…', file.name);
+          }
+        });
+        uploadedItems.push(item);
+        completedBytes += Math.max(1, file.size);
+      }
+
+      setUploadProgress(94, 'Saving post to Supabase…', '');
+      const images = uploadedItems.filter(item => item.mediaType === 'image');
+      const videos = uploadedItems.filter(item => item.mediaType === 'video');
+      const id = Date.now();
+
+      if (videos.length === 1 && images.length === 0) {
+        posts.unshift({
+          id, type: 'reel', username: 'yourbrand', avatar: 'YB',
+          thumbnail: videos[0].thumbnailUrl || videos[0].url,
+          thumbnailStoragePath: videos[0].thumbnailPath || null,
+          videoUrl: videos[0].url, storagePath: videos[0].path,
+          caption: '', likes: Math.floor(Math.random() * 5000) + 500,
+          views: (Math.random() * 50 + 5).toFixed(1) + 'K', isDemo: false
+        });
+      } else {
+        const allSlides = uploadedItems.map(item => ({
+          url: item.url, type: item.mediaType, storagePath: item.path,
+          thumbnailUrl: item.thumbnailUrl || null, thumbnailPath: item.thumbnailPath || null
+        }));
+        if (allSlides.length) {
+          posts.unshift({
+            id, type: 'carousel', username: 'yourbrand', avatar: 'YB', slides: allSlides,
+            currentSlide: 0, caption: '', likes: Math.floor(Math.random() * 3000) + 500, isDemo: false
+          });
+        }
+      }
+
+      nextId = Math.max(nextId, id + 1);
+      await savePosts();
+      renderGallery();
+      if (input) input.value = '';
+      setUploadProgress(100, 'Upload complete', `${fileArray.length} file${fileArray.length === 1 ? '' : 's'} ready`);
+      setTimeout(resetUploadProgress, 850);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      const paths = uploadedItems.flatMap(item => [item.path, item.thumbnailPath]).filter(Boolean);
+      if (paths.length) supabaseClient.storage.from(SUPABASE_BUCKET).remove(paths).catch(() => {});
+      setUploadProgress(0, 'Upload failed', error.message || String(error));
+      alert('Upload failed: ' + (error.message || error));
+      setTimeout(resetUploadProgress, 1800);
+    }
+  }
+
+  function markGridMediaLoaded(media) {
+    media?.closest('.grid-cell')?.classList.add('media-loaded');
+  }
+
+  function primarySlideInfo(post) {
+    const first = post?.slides?.[0];
+    if (!first) return { url: '', type: 'image', thumbnailUrl: null };
+    return typeof first === 'object'
+      ? { url: first.url || '', type: first.type || 'image', thumbnailUrl: first.thumbnailUrl || null }
+      : { url: first, type: 'image', thumbnailUrl: null };
+  }
+
+  function renderGridCell(post) {
+    let media = '';
+    let badge = '';
+    const commonImg = `crossorigin="anonymous" loading="lazy" onerror="handleBrokenMedia(event,${post.id})"`;
+
+    if (post.type === 'reel') {
+      const hasVideo = Boolean(post.videoUrl);
+      const hasRealThumbnail = post.thumbnail && post.thumbnail !== post.videoUrl;
+      media = hasRealThumbnail
+        ? `<img src="${post.thumbnail}" alt="reel thumbnail" ${commonImg} onload="markGridMediaLoaded(this);validateThumbnailImage(this,${post.id})">`
+        : (hasVideo
+          ? `<video src="${post.videoUrl}" muted playsinline preload="metadata" crossorigin="anonymous" onloadeddata="primeVideoPreview(this);markGridMediaLoaded(this)" onerror="handleBrokenMedia(event,${post.id})"></video>`
+          : `<div class="video-thumb-placeholder"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"/></svg><span>Video</span></div>`);
+      badge = `<div class="grid-views"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>${post.views || ''}</div>`;
+    } else {
+      const first = primarySlideInfo(post);
+      if (first.type === 'video' && first.thumbnailUrl) {
+        media = `<img src="${first.thumbnailUrl}" alt="post thumbnail" ${commonImg} onload="markGridMediaLoaded(this)">`;
+      } else if (first.type === 'video') {
+        media = `<video src="${first.url}" muted playsinline preload="metadata" crossorigin="anonymous" onloadeddata="primeVideoPreview(this);markGridMediaLoaded(this)" onerror="handleBrokenMedia(event,${post.id})"></video>`;
+      } else {
+        media = `<img src="${first.url}" alt="post" ${commonImg} onload="markGridMediaLoaded(this)">`;
+      }
+      if (post.slides.length > 1) {
+        badge = `<div class="grid-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="2" width="14" height="14" rx="2" fill="rgba(0,0,0,0.35)"/><path d="M4 6v14a2 2 0 0 0 2 2h14"/></svg></div>`;
+      }
+    }
+
+    return `<div class="grid-cell" data-post-id="${post.id}" onclick="openViewer(${post.id},this)">${media}${badge}</div>`;
+  }
+
+  function renderCarousel(post) {
+    post.currentSlide = Number.isInteger(post.currentSlide) ? post.currentSlide : 0;
+    const dots = post.slides.map((_, i) => `<div class="dot ${i === post.currentSlide ? 'active' : ''}"></div>`).join('');
+    const slidesHtml = post.slides.map(slide => {
+      const url = typeof slide === 'object' ? slide.url : slide;
+      const type = typeof slide === 'object' ? slide.type : 'image';
+      return `<div class="carousel-slide">${type === 'video'
+        ? `<video src="${url}" loop playsinline muted preload="metadata"></video>`
+        : `<img src="${url}" alt="carousel slide" loading="lazy">`}</div>`;
+    }).join('');
+
+    return `<div class="post-card" data-id="${post.id}">
+      <div class="post-header">
+        <div class="avatar">${post.avatar}</div><div class="post-header-info"><div class="username">${post.username}</div></div>
+        ${!clientMode ? `<button class="creator-delete-btn" aria-label="Delete post" title="Delete post" onclick="event.stopPropagation();deletePost(${post.id})">${trashIconSvg()}</button>` : ''}
+        <button class="header-more-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
+      </div>
+      <div class="media-container" ontouchstart="swipeStart(event)" ontouchend="carouselSwipeEnd(event,${post.id})">
+        <div class="carousel-track" id="track-${post.id}" style="transform:translateX(-${post.currentSlide * 100}%);">${slidesHtml}</div>
+        ${post.slides.length > 1 ? `<button class="carousel-nav prev" onclick="event.stopPropagation();prevSlide(${post.id})">‹</button><button class="carousel-nav next" onclick="event.stopPropagation();nextSlide(${post.id})">›</button><div class="slide-counter">${post.currentSlide + 1}/${post.slides.length}</div>` : ''}
+      </div>
+      <div class="post-actions">
+        <button class="action-btn" onclick="event.stopPropagation();toggleLike(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+        <button class="action-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></button>
+        <button class="action-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+        <button class="action-btn" style="margin-left:auto" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+      </div>
+      ${post.slides.length > 1 ? `<div class="carousel-dots">${dots}</div>` : ''}
+      <div class="post-likes">${post.likes.toLocaleString()} likes</div>
+      ${!clientMode ? `<textarea class="caption-input" rows="2" placeholder="Write a caption..." onclick="event.stopPropagation()" onblur="updateCaption(${post.id},this.value)">${post.caption || ''}</textarea>` : `<div class="post-caption"><span class="user">${post.username}</span>${formatCaption(post.caption || '')}</div>`}
+      <div class="post-comments-link">View all 24 comments</div><div class="post-timestamp">2 hours ago</div>
+    </div>`;
+  }
+
+  function renderReel(post) {
+    const hasVideo = Boolean(post.videoUrl);
+    const videoId = `video-${post.id}`;
+    videoRefs[post.id] = { playing:false, muted:true };
+    return `<div class="post-card" data-id="${post.id}">
+      <div class="post-header">
+        <div class="avatar">${post.avatar}</div><div class="post-header-info"><div class="username">${post.username}</div><div class="location">Original audio</div></div>
+        ${!clientMode ? `<button class="creator-delete-btn" aria-label="Delete post" title="Delete post" onclick="event.stopPropagation();deletePost(${post.id})">${trashIconSvg()}</button>` : ''}
+        <button class="header-more-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
+      </div>
+      <div class="media-container" id="media-${post.id}">
+        ${hasVideo ? `<video id="${videoId}" class="video-reel" src="${post.videoUrl}" loop playsinline muted preload="metadata"></video>
+          <div class="play-overlay" id="play-${post.id}" onclick="event.stopPropagation();togglePlay(${post.id})"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+          <button class="mute-btn" id="mute-${post.id}" onclick="event.stopPropagation();toggleMute(${post.id})">${soundIconSvg(true)}</button>
+          <div class="video-controls" id="controls-${post.id}"><button onclick="event.stopPropagation();togglePlay(${post.id})"><svg viewBox="0 0 24 24" fill="currentColor" id="play-icon-${post.id}"><polygon points="5 3 19 12 5 21 5 3"/></svg></button><div class="progress-bar" onclick="event.stopPropagation();seekVideo(event,${post.id})"><div class="progress-fill" id="progress-${post.id}"></div></div><span class="time-display" id="time-${post.id}">0:00</span></div>`
+          : `<img src="${post.thumbnail}" alt="reel thumbnail" loading="lazy"><div class="reel-badge"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>Reels</div>`}
+      </div>
+      <div class="post-actions">
+        <button class="action-btn" onclick="event.stopPropagation();toggleLike(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+        <button class="action-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></button>
+        <button class="action-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+        <button class="action-btn" style="margin-left:auto" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+      </div>
+      <div class="post-likes">${post.likes.toLocaleString()} likes</div>
+      ${!clientMode ? `<textarea class="caption-input" rows="2" placeholder="Write a caption..." onclick="event.stopPropagation()" onblur="updateCaption(${post.id},this.value)">${post.caption || ''}</textarea>` : `<div class="post-caption"><span class="user">${post.username}</span>${formatCaption(post.caption || '')}</div>`}
+      <div class="post-comments-link">View all 24 comments</div><div class="post-timestamp">2 hours ago</div>
+    </div>`;
+  }
+
+  function getViewerPosts() {
+    if (clientMode && profileTab === 'reels') return posts.filter(post => post.type === 'reel' && isRenderablePost(post));
+    return posts.filter(isRenderablePost);
+  }
+
+  function renderViewerFeedItem(post, index, total) {
+    return `<section class="viewer-feed-item" data-post-id="${post.id}">${post.type === 'reel' ? renderReelViewer(post) : renderCarouselViewer(post)}<div class="viewer-feed-position">${index + 1}/${total}</div></section>`;
+  }
+
+  function renderReelViewer(post) {
+    const hasVideo = Boolean(post.videoUrl);
+    const id = post.id;
+    return `<div class="reel-viewer">
+      <div class="reel-media-wrap viewer-transition-target">
+        ${hasVideo ? `<video id="viewer-reel-video-${id}" class="reel-video" src="${post.videoUrl}" crossorigin="anonymous" loop playsinline ${globalMuted ? 'muted' : ''} preload="metadata" ontimeupdate="viewerReelUpdateProgress(${id})" onended="viewerReelOnEnded(${id})"></video><div class="reel-play-overlay" id="reel-play-overlay-${id}" onclick="viewerReelTogglePlay(${id})"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>` : `<img src="${post.thumbnail}" alt="reel" class="reel-video">`}
+      </div>
+      <div class="reel-overlay-gradient"></div>
+      <div class="reel-topbar"><div class="reel-title">Reels</div><div class="reel-topbar-right"><span class="reel-camera-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span><button class="reel-close" onclick="closeViewer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>
+      ${hasVideo ? `<button class="reel-viewer-mute" id="viewer-reel-mute-${id}" onclick="viewerReelToggleMute(${id})">${soundIconSvg(globalMuted)}</button>` : ''}
+      <div class="reel-left-info"><div class="reel-user-row"><div class="avatar">${post.avatar}</div><span class="reel-username">${post.username}</span><button class="reel-follow-btn">Follow</button></div><div class="reel-caption-text">${formatCaption(post.caption || '')}</div><div class="reel-audio-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span class="reel-audio-text">${post.username} · Original audio</span></div></div>
+      <div class="reel-right-actions">
+        <div class="reel-action-item" onclick="viewerReelToggleLike(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="reel-action-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="reel-action-label">${post.likes.toLocaleString()}</span></div>
+        <div class="reel-action-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="reel-action-icon"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg><span class="reel-action-label">${Math.floor(Math.random() * 500 + 50)}</span></div>
+        <div class="reel-action-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="reel-action-icon"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg><span class="reel-action-label">${Math.floor(Math.random() * 900 + 100)}</span></div>
+        <div class="reel-action-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="reel-action-icon"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div>
+        <div class="reel-action-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="reel-action-icon"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></div><div class="reel-action-item" style="margin-top:4px"><div class="reel-disc-spin">${post.avatar}</div></div>
+      </div>
+      ${hasVideo ? `<div class="reel-progress-track" onclick="viewerReelSeek(event,${id})"><div class="reel-progress-fill" id="reel-progress-${id}"></div></div>` : ''}
+    </div>`;
+  }
+
+  function renderCarouselViewer(post) {
+    const id = post.id;
+    const slideIndex = Number.isInteger(post.currentSlide) ? post.currentSlide : 0;
+    const dots = post.slides.map((_, i) => `<div class="dot ${i === slideIndex ? 'active' : ''}"></div>`).join('');
+    const slidesHtml = post.slides.map(slide => {
+      const url = typeof slide === 'object' ? slide.url : slide;
+      const type = typeof slide === 'object' ? slide.type : 'image';
+      return `<div class="carousel-slide">${type === 'video' ? `<video src="${url}" crossorigin="anonymous" loop playsinline ${globalMuted ? 'muted' : ''} preload="metadata"></video>` : `<img src="${url}" crossorigin="anonymous" alt="carousel">`}</div>`;
+    }).join('');
+    return `<div class="carousel-viewer">
+      <div class="carousel-viewer-header"><div class="avatar">${post.avatar}</div><div class="post-header-info"><div class="username">${post.username}</div></div><button class="more-btn" onclick="closeViewer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="carousel-viewer-media viewer-transition-target" ontouchstart="swipeStart(event)" ontouchend="viewerSwipeEnd(event,${id})">
+        <div class="carousel-track" id="viewer-track-${id}" style="transform:translateX(-${slideIndex * 100}%);">${slidesHtml}</div>
+        <div class="carousel-video-play" id="carousel-video-play-${id}" onclick="viewerCarouselTogglePlay(${id})" style="display:none"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+        <button class="carousel-video-mute" id="carousel-video-mute-${id}" onclick="viewerCarouselToggleMute(${id})" style="display:none">${soundIconSvg(globalMuted)}</button>
+        ${post.slides.length > 1 ? `<button class="carousel-viewer-nav prev" onclick="viewerCarouselPrevSlide(${id})">‹</button><button class="carousel-viewer-nav next" onclick="viewerCarouselNextSlide(${id})">›</button><div class="carousel-viewer-dots" id="viewer-dots-${id}">${dots}</div><div class="slide-counter" id="viewer-slide-counter-${id}">${slideIndex + 1}/${post.slides.length}</div>` : ''}
+      </div>
+      <div class="carousel-viewer-actions"><button class="action-btn" onclick="toggleLike(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button><button class="action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></button><button class="action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button><button class="action-btn bookmark-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button></div>
+      <div class="carousel-viewer-likes">${post.likes.toLocaleString()} likes</div><div class="carousel-viewer-caption"><span class="user">${post.username}</span> ${formatCaption(post.caption || '')}</div><div class="carousel-viewer-comments"><div class="view-all">View all 24 comments</div><div class="comment"><span class="user">client_name</span> Love this! 🔥</div><div class="comment"><span class="user">teammate_1</span> Looks amazing</div></div><div class="post-timestamp">2 hours ago</div><div class="carousel-viewer-input"><div class="avatar">YB</div><input type="text" placeholder="Add a comment..."><button class="send-btn">Post</button></div>
+    </div>`;
+  }
+
+  function currentViewerCarouselVideo(postId = viewerPostId) {
+    const post = posts.find(p => p.id === postId);
+    const track = document.getElementById(`viewer-track-${postId}`);
+    if (!post || !track) return null;
+    const slides = track.querySelectorAll('.carousel-slide');
+    return slides[post.currentSlide || 0]?.querySelector('video') || null;
+  }
+
+  function updateViewerMuteButtons() {
+    document.querySelectorAll('.reel-viewer-mute,.carousel-video-mute').forEach(btn => { btn.innerHTML = soundIconSvg(globalMuted); });
+    document.querySelectorAll('.post-viewer video').forEach(video => { video.muted = globalMuted; });
+  }
+
+  function setGlobalMuted(muted) {
+    globalMuted = Boolean(muted);
+    updateViewerMuteButtons();
+    const activePost = posts.find(item => Number(item.id) === Number(viewerPostId));
+    const activeVideo = activePost?.type === 'carousel'
+      ? currentViewerCarouselVideo(activePost.id)
+      : document.getElementById(`viewer-reel-video-${viewerPostId}`);
+    if (activeVideo && activeVideo.paused) activeVideo.play().catch(() => {});
+  }
+
+  function syncViewerCarouselMedia(postId = viewerPostId) {
+    const post = posts.find(p => p.id === postId);
+    const track = document.getElementById(`viewer-track-${postId}`);
+    if (!post || !track) return;
+    const isActive = Number(viewerPostId) === Number(postId);
+    track.querySelectorAll('.carousel-slide').forEach((slideEl, index) => {
+      const video = slideEl.querySelector('video');
+      if (!video) return;
+      video.muted = globalMuted;
+      if (isActive && index === post.currentSlide) video.play().catch(() => {});
+      else { video.pause(); if (index !== post.currentSlide) { try { video.currentTime = 0; } catch (_) {} } }
+    });
+    const overlay = document.getElementById(`carousel-video-play-${postId}`);
+    const muteBtn = document.getElementById(`carousel-video-mute-${postId}`);
+    const currentVideo = currentViewerCarouselVideo(postId);
+    if (overlay) {
+      overlay.style.display = currentVideo ? 'flex' : 'none';
+      const icon = overlay.querySelector('svg');
+      if (icon) icon.style.display = currentVideo?.paused ? 'block' : 'none';
+    }
+    if (muteBtn) { muteBtn.style.display = currentVideo ? 'flex' : 'none'; muteBtn.innerHTML = soundIconSvg(globalMuted); }
+  }
+
+  function viewerCarouselTogglePlay(postId = viewerPostId) {
+    if (Date.now() - lastSwipeAt < 700) return;
+    const video = currentViewerCarouselVideo(postId);
+    if (!video) return;
+    if (video.paused) video.play().catch(() => {}); else video.pause();
+    const icon = document.querySelector(`#carousel-video-play-${postId} svg`);
+    if (icon) icon.style.display = video.paused ? 'block' : 'none';
+  }
+
+  function viewerCarouselToggleMute(postId = viewerPostId) { setGlobalMuted(!globalMuted); }
+
+  function viewerCarouselGo(postId, direction) {
+    const post = posts.find(p => p.id === postId);
+    if (!post || post.slides.length <= 1) return;
+    post.currentSlide = (post.currentSlide + direction + post.slides.length) % post.slides.length;
+    const track = document.getElementById(`viewer-track-${postId}`);
+    if (track) track.style.transform = `translateX(-${post.currentSlide * 100}%)`;
+    document.querySelectorAll(`#viewer-dots-${postId} .dot`).forEach((dot, index) => dot.classList.toggle('active', index === post.currentSlide));
+    const counter = document.getElementById(`viewer-slide-counter-${postId}`);
+    if (counter) counter.textContent = `${post.currentSlide + 1}/${post.slides.length}`;
+    syncViewerCarouselMedia(postId);
+  }
+  function viewerCarouselNextSlide(postId = viewerPostId) { viewerCarouselGo(postId, 1); }
+  function viewerCarouselPrevSlide(postId = viewerPostId) { viewerCarouselGo(postId, -1); }
+  function initCarouselViewerVideo(post) { syncViewerCarouselMedia(post.id); }
+
+  function initReelViewerVideo(post) {
+    const video = document.getElementById(`viewer-reel-video-${post.id}`);
+    if (!video) return;
+    viewerVideoRef = video;
+    video.muted = globalMuted;
+    video.play().then(() => {
+      const overlay = document.getElementById(`reel-play-overlay-${post.id}`);
+      if (overlay) overlay.style.display = 'none';
+    }).catch(() => {
+      const overlay = document.getElementById(`reel-play-overlay-${post.id}`);
+      if (overlay) overlay.style.display = 'flex';
+    });
+  }
+
+  function viewerReelTogglePlay(postId = viewerPostId) {
+    const video = document.getElementById(`viewer-reel-video-${postId}`);
+    const overlay = document.getElementById(`reel-play-overlay-${postId}`);
+    if (!video) return;
+    if (video.paused) video.play().catch(() => {}); else video.pause();
+    if (overlay) overlay.style.display = video.paused ? 'flex' : 'none';
+  }
+  function viewerReelToggleMute(postId = viewerPostId) { setGlobalMuted(!globalMuted); }
+  function viewerReelUpdateProgress(postId = viewerPostId) {
+    const video = document.getElementById(`viewer-reel-video-${postId}`);
+    const fill = document.getElementById(`reel-progress-${postId}`);
+    if (video && fill && Number.isFinite(video.duration) && video.duration > 0) fill.style.width = `${(video.currentTime / video.duration) * 100}%`;
+  }
+  function viewerReelOnEnded(postId = viewerPostId) {
+    const video = document.getElementById(`viewer-reel-video-${postId}`);
+    if (video) { video.currentTime = 0; video.play().catch(() => {}); }
+  }
+  function viewerReelSeek(event, postId = viewerPostId) {
+    const video = document.getElementById(`viewer-reel-video-${postId}`);
+    if (!video || !Number.isFinite(video.duration)) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    video.currentTime = Math.max(0, Math.min(video.duration, ((event.clientX - rect.left) / rect.width) * video.duration));
+  }
+
+  function viewerSwipeEnd(event, postId = viewerPostId) {
+    const direction = swipeDirection(event);
+    if (!direction) return;
+    event.preventDefault();
+    if (direction === 'left') viewerCarouselNextSlide(postId); else viewerCarouselPrevSlide(postId);
+  }
+
+  function activateViewerPost(postId) {
+    const numericId = Number(postId);
+    if (!Number.isFinite(numericId)) return;
+    viewerPostId = numericId;
+    document.querySelectorAll('.viewer-feed-item').forEach(item => {
+      const active = Number(item.dataset.postId) === numericId;
+      item.classList.toggle('active-viewer-item', active);
+      item.querySelectorAll('video').forEach(video => { if (!active) video.pause(); });
+    });
+    const post = posts.find(item => Number(item.id) === numericId);
+    if (!post) return;
+    if (post.type === 'reel') initReelViewerVideo(post); else syncViewerCarouselMedia(post.id);
+    updateViewerMuteButtons();
+  }
+
+  function handleViewerFeedScroll() {
+    if (viewerScrollRaf) return;
+    viewerScrollRaf = requestAnimationFrame(() => {
+      viewerScrollRaf = 0;
+      const feed = document.getElementById('viewerInner');
+      if (!feed) return;
+      const center = feed.getBoundingClientRect().top + feed.clientHeight / 2;
+      let best = null, distance = Infinity;
+      feed.querySelectorAll('.viewer-feed-item').forEach(item => {
+        const rect = item.getBoundingClientRect();
+        const current = Math.abs(rect.top + rect.height / 2 - center);
+        if (current < distance) { distance = current; best = item; }
+      });
+      if (best && Number(best.dataset.postId) !== Number(viewerPostId)) activateViewerPost(best.dataset.postId);
+    });
+  }
+
+  function visualUrlForPost(post) {
+    if (!post) return '';
+    if (post.type === 'reel') return post.thumbnail && post.thumbnail !== post.videoUrl ? post.thumbnail : '';
+    const slide = post.slides?.[post.currentSlide || 0] || post.slides?.[0];
+    if (typeof slide === 'object') return slide.thumbnailUrl || (slide.type === 'image' ? slide.url : '');
+    return slide || '';
+  }
+
+  function makeTransitionVisual(post, sourceElement) {
+    const image = sourceElement?.querySelector?.('img');
+    if (image?.src) {
+      const clone = document.createElement('img'); clone.src = image.src; return clone;
+    }
+    const video = sourceElement?.querySelector?.('video');
+    if (video && video.readyState >= 2) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, video.videoWidth); canvas.height = Math.max(1, video.videoHeight);
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const clone = document.createElement('img'); clone.src = canvas.toDataURL('image/jpeg', .82); return clone;
+      } catch (_) {}
+    }
+    const url = visualUrlForPost(post);
+    if (url) { const clone = document.createElement('img'); clone.src = url; return clone; }
+    return null;
+  }
+
+  function positionTransitionClone(clone, rect, radius = 0) {
+    Object.assign(clone.style, { top:`${rect.top}px`, left:`${rect.left}px`, width:`${rect.width}px`, height:`${rect.height}px`, borderRadius:`${radius}px` });
+  }
+
+  function animateViewerOpen(sourceElement, postId) {
+    if (!sourceElement || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const target = document.querySelector(`.viewer-feed-item[data-post-id="${postId}"] .viewer-transition-target`);
+    const post = posts.find(item => Number(item.id) === Number(postId));
+    if (!target || !post) return;
+    const startRect = sourceElement.getBoundingClientRect();
+    const endRect = target.getBoundingClientRect();
+    if (!startRect.width || !endRect.width) return;
+    const clone = makeTransitionVisual(post, sourceElement);
+    if (!clone) return;
+    clone.className = 'viewer-transition-clone';
+    clone.style.objectFit = 'cover';
+    positionTransitionClone(clone, startRect, 0);
+    target.style.opacity = '0';
+    document.body.appendChild(clone);
+    requestAnimationFrame(() => requestAnimationFrame(() => positionTransitionClone(clone, endRect, innerWidth > 735 ? 6 : 0)));
+    setTimeout(() => { target.style.opacity = ''; clone.remove(); }, 300);
+  }
+
+  function openViewer(id, sourceElement = null) {
+    if (Date.now() - lastSwipeAt < 700 || viewerClosing) return;
+    const post = posts.find(item => Number(item.id) === Number(id));
+    if (!post) return;
+    const viewerPosts = getViewerPosts();
+    viewerPosts.forEach(item => { if (item.type === 'carousel') item.currentSlide = 0; });
+    viewerPostId = Number(id);
+    viewerOpenSource = sourceElement || document.querySelector(`.grid-cell[data-post-id="${id}"]`);
+
+    const viewer = document.getElementById('postViewer');
+    const inner = document.getElementById('viewerInner');
+    inner.className = 'post-viewer-inner viewer-feed';
+    inner.innerHTML = viewerPosts.map((item, index) => renderViewerFeedItem(item, index, viewerPosts.length)).join('') + (viewerPosts.length > 1 ? '<div class="viewer-neighbour-hint">Scroll for neighbouring posts</div>' : '');
+    viewer.classList.add('active', 'preparing');
+    document.body.style.overflow = 'hidden';
+    const targetItem = inner.querySelector(`.viewer-feed-item[data-post-id="${id}"]`);
+    if (targetItem) inner.scrollTop = targetItem.offsetTop;
+    // Keep the first play() inside the user's tap gesture so mobile browsers can start with sound.
+    activateViewerPost(id);
+
+    requestAnimationFrame(() => {
+      viewer.classList.remove('preparing');
+      animateViewerOpen(viewerOpenSource, id);
+    });
+
+    if (viewerScrollHandler) inner.removeEventListener('scroll', viewerScrollHandler);
+    viewerScrollHandler = handleViewerFeedScroll;
+    inner.addEventListener('scroll', viewerScrollHandler, { passive:true });
+  }
+
+  function finalizeViewerClose() {
+    document.querySelectorAll('#postViewer video').forEach(video => { video.pause(); video.removeAttribute('src'); try { video.load(); } catch (_) {} });
+    const viewer = document.getElementById('postViewer');
+    const inner = document.getElementById('viewerInner');
+    if (viewerScrollHandler) inner.removeEventListener('scroll', viewerScrollHandler);
+    viewerScrollHandler = null;
+    inner.innerHTML = '';
+    inner.className = 'post-viewer-inner';
+    viewer.classList.remove('active', 'preparing', 'is-closing');
+    document.body.style.overflow = '';
+    viewerVideoRef = null;
+    viewerCarouselVideos = {};
+    viewerPostId = null;
+    viewerOpenSource = null;
+    viewerClosing = false;
+  }
+
+  function closeViewer() {
+    if (viewerClosing || viewerPostId == null) return;
+    viewerClosing = true;
+    const viewer = document.getElementById('postViewer');
+    const activeItem = viewer.querySelector(`.viewer-feed-item[data-post-id="${viewerPostId}"]`);
+    const target = activeItem?.querySelector('.viewer-transition-target');
+    const source = document.querySelector(`.grid-cell[data-post-id="${viewerPostId}"]`) || viewerOpenSource;
+    const sourceRect = source?.getBoundingClientRect?.();
+    const targetRect = target?.getBoundingClientRect?.();
+    const sourceVisible = sourceRect && sourceRect.bottom > 0 && sourceRect.top < innerHeight && sourceRect.right > 0 && sourceRect.left < innerWidth;
+    const post = posts.find(item => Number(item.id) === Number(viewerPostId));
+
+    if (!target || !sourceVisible || !targetRect?.width || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      viewer.classList.add('is-closing');
+      setTimeout(finalizeViewerClose, 210);
+      return;
+    }
+
+    const clone = makeTransitionVisual(post, target);
+    if (!clone) { viewer.classList.add('is-closing'); setTimeout(finalizeViewerClose, 210); return; }
+    clone.className = 'viewer-transition-clone'; clone.style.objectFit = 'cover';
+    positionTransitionClone(clone, targetRect, innerWidth > 735 ? 6 : 0);
+    document.body.appendChild(clone);
+    target.style.opacity = '0';
+    viewer.classList.add('is-closing');
+    requestAnimationFrame(() => requestAnimationFrame(() => positionTransitionClone(clone, sourceRect, 0)));
+    setTimeout(() => { clone.remove(); finalizeViewerClose(); }, 300);
+  }
+
+  function goToSlide(post, index) {
+    post.currentSlide = index;
+    const track = document.getElementById(`track-${post.id}`);
+    if (track) track.style.transform = `translateX(-${post.currentSlide * 100}%)`;
+    const card = document.querySelector(`.post-card[data-id="${post.id}"]`);
+    if (card) {
+      card.querySelectorAll('.carousel-dots .dot').forEach((dot, i) => dot.classList.toggle('active', i === post.currentSlide));
+      const counter = card.querySelector('.slide-counter');
+      if (counter) counter.textContent = `${post.currentSlide + 1}/${post.slides.length}`;
+    }
+  }
+
+  async function deletePost(id) {
+    const post = posts.find(item => Number(item.id) === Number(id));
+    if (!post) return;
+    if (!confirm('Delete this post? This cannot be undone.')) return;
+
+    // Database first: another device can no longer render a row whose files are gone.
+    if (!post.isDemo) {
+      const { error } = await supabaseClient.from('sns_posts').delete().eq('id', id);
+      if (error) { alert('Could not delete the post: ' + error.message); return; }
+    }
+
+    posts = posts.filter(item => Number(item.id) !== Number(id));
+    delete videoRefs[id];
+    renderGallery();
+
+    const paths = getPostStoragePaths(post);
+    if (paths.length) {
+      const { error: storageError } = await supabaseClient.storage.from(SUPABASE_BUCKET).remove(paths);
+      if (storageError) console.warn('Post row was deleted, but some media files could not be removed:', storageError);
+    }
+    await refreshPostsFromCloud(true);
+  }
+
+  function getPostMediaUrls(post) {
+    if (!post) return [];
+    if (post.type === 'reel') return [post.videoUrl, post.thumbnail].filter(Boolean);
+    return (post.slides || []).flatMap(slide => typeof slide === 'object' ? [slide.url, slide.thumbnailUrl] : [slide]).filter(Boolean);
+  }
+
+  async function handleBrokenMedia(event, postId) {
+    event?.target?.closest?.('.grid-cell')?.classList.add('media-loaded');
+    if (ghostChecks.has(postId)) return;
+    ghostChecks.add(postId);
+    try {
+      const post = posts.find(item => Number(item.id) === Number(postId));
+      if (!post || post.isDemo) return;
+      const urls = [...new Set(getPostMediaUrls(post))];
+      if (!urls.length) return;
+      const statuses = await Promise.all(urls.map(async url => {
+        try { const response = await fetch(url, { method:'HEAD', cache:'no-store' }); return response.status; }
+        catch (_) { return 0; }
+      }));
+      const confirmedMissing = statuses.length && statuses.every(status => status === 400 || status === 404 || status === 410);
+      if (!confirmedMissing) return;
+      await supabaseClient.from('sns_posts').delete().eq('id', postId);
+      posts = posts.filter(item => Number(item.id) !== Number(postId));
+      renderGallery();
+    } finally {
+      setTimeout(() => ghostChecks.delete(postId), 5000);
+    }
+  }
+
+  async function validateThumbnailImage(image, postId) {
+    try {
+      const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32;
+      const ctx = canvas.getContext('2d', { willReadFrequently:true });
+      ctx.drawImage(image, 0, 0, 32, 32);
+      const data = ctx.getImageData(0, 0, 32, 32).data;
+      let sum = 0, sumSq = 0, count = 0;
+      for (let i = 0; i < data.length; i += 16) { const l = data[i] * .2126 + data[i+1] * .7152 + data[i+2] * .0722; sum += l; sumSq += l*l; count++; }
+      const mean = sum / count; const variance = sumSq / count - mean * mean;
+      if (mean < 5 && variance < 12) repairPostThumbnail(postId);
+    } catch (_) {}
+  }
+
+  async function repairPostThumbnail(postId) {
+    if (thumbnailRepairing.has(postId)) return;
+    const post = posts.find(item => Number(item.id) === Number(postId));
+    if (!post || post.type !== 'reel' || !post.videoUrl || post.isDemo) return;
+    thumbnailRepairing.add(postId);
+    try {
+      const response = await fetch(post.videoUrl, { cache:'no-store' });
+      if (!response.ok) return;
+      const blob = await response.blob();
+      const file = new File([blob], `repair-${postId}.mp4`, { type:blob.type || 'video/mp4' });
+      const thumb = await createVideoThumbnail(file);
+      if (!thumb) return;
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session?.user) return;
+      const path = `${session.user.id}/thumbnails/${Date.now()}-${crypto.randomUUID()}-repair.jpg`;
+      await uploadBinaryToSupabase(path, thumb);
+      const { data: publicData } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
+      const oldPath = post.thumbnailStoragePath;
+      post.thumbnail = publicData.publicUrl;
+      post.thumbnailStoragePath = path;
+      await savePosts();
+      if (oldPath) supabaseClient.storage.from(SUPABASE_BUCKET).remove([oldPath]).catch(() => {});
+      renderGallery();
+    } catch (error) {
+      console.warn('Automatic thumbnail repair failed:', error);
+    } finally {
+      thumbnailRepairing.delete(postId);
+    }
+  }
+
+  async function refreshPostsFromCloud(silent = true) {
+    if (!document.body.classList.contains('auth-locked') && !uploadInProgress) {
+      const fresh = await loadPosts({ silent, keepCurrent:true });
+      posts = fresh;
+      if (!document.getElementById('postViewer').classList.contains('active')) renderGallery();
+    }
+  }
+
+  function scheduleCloudRefresh() {
+    clearTimeout(cloudRefreshTimer);
+    cloudRefreshTimer = setTimeout(() => refreshPostsFromCloud(true), 220);
+  }
+
+  function setupRealtimeSync() {
+    if (realtimeChannel || Array.isArray(window.__EXPORTED_POSTS__)) return;
+    try {
+      realtimeChannel = supabaseClient.channel('sns-posts-live')
+        .on('postgres_changes', { event:'*', schema:'public', table:'sns_posts' }, scheduleCloudRefresh)
+        .subscribe();
+    } catch (error) { console.warn('Realtime sync unavailable:', error); }
+  }
+
+  function teardownRealtimeSync() {
+    if (!realtimeChannel) return;
+    try { supabaseClient.removeChannel(realtimeChannel); } catch (_) {}
+    realtimeChannel = null;
+  }
+
+  async function applyAuthSession(session) {
+    const overlay = document.getElementById('authOverlay');
+    const signOut = document.getElementById('signOutBtn');
+    const authUser = document.getElementById('authUser');
+    if (!session?.user) {
+      teardownRealtimeSync();
+      document.body.classList.add('auth-locked'); overlay.classList.add('active'); signOut.style.display = 'none'; authUser.textContent = '';
+      posts = []; document.getElementById('gallery').innerHTML = ''; appBooted = false; return;
+    }
+    document.body.classList.remove('auth-locked'); overlay.classList.remove('active'); signOut.style.display = 'inline-flex'; authUser.textContent = session.user.email || 'Signed in'; setAuthMessage('');
+    if (!appBooted) {
+      renderGallerySkeleton();
+      posts = await loadPosts();
+      renderGallery();
+      appBooted = true;
+    }
+    setupRealtimeSync();
+  }
+
+  function revealClientNav() {
+    document.getElementById('app')?.classList.remove('client-nav-hidden');
+  }
+
+  function handleClientWindowScroll() {
+    if (!clientMode || document.getElementById('postViewer').classList.contains('active')) return;
+    const y = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
+    const delta = y - clientNavLastY;
+    const app = document.getElementById('app');
+    if (y < 24 || delta < -7) app?.classList.remove('client-nav-hidden');
+    else if (delta > 8 && y > 72) app?.classList.add('client-nav-hidden');
+    clientNavLastY = y;
+  }
+
+  function setClientMode(enabled) {
+    clientMode = Boolean(enabled);
+    document.getElementById('clientSwitch')?.classList.toggle('on', clientMode);
+    const app = document.getElementById('app');
+    app?.classList.toggle('client-view', clientMode);
+    app?.classList.remove('client-nav-hidden');
+    clientNavLastY = window.scrollY || 0;
+    renderGallery();
+  }
+
+  window.addEventListener('scroll', handleClientWindowScroll, { passive:true });
+  window.addEventListener('touchstart', event => { clientTouchStartY = event.touches?.[0]?.clientY || 0; }, { passive:true });
+  window.addEventListener('touchmove', event => {
+    if (!clientMode) return;
+    const y = event.touches?.[0]?.clientY || 0;
+    if (y - clientTouchStartY > 24) revealClientNav();
+  }, { passive:true });
+  window.addEventListener('focus', () => { if (appBooted) scheduleCloudRefresh(); });
+  window.addEventListener('pageshow', () => { if (appBooted) scheduleCloudRefresh(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && appBooted) scheduleCloudRefresh(); });
+
 
   async function initializeApp() {
     initializeTheme();
