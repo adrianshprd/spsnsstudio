@@ -1630,6 +1630,23 @@
     .reel-left-info { min-width:0; max-width:100%; }
   }
 
+
+  /* ===== CAROUSEL COLOUR-FIDELITY FIX =====
+   * Keep client carousel artwork on a neutral white canvas. A black backing can
+   * visibly darken PNGs/WebPs that contain transparency or soft alpha edges.
+   * Reels intentionally keep their black fullscreen backing.
+   */
+  .carousel-viewer-media,
+  .carousel-viewer-media .carousel-slide {
+    background: #fff !important;
+  }
+  .carousel-viewer-media .carousel-slide img,
+  .carousel-viewer-media .carousel-slide video {
+    opacity: 1 !important;
+    filter: none !important;
+    -webkit-filter: none !important;
+    mix-blend-mode: normal !important;
+  }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
