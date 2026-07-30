@@ -1647,6 +1647,24 @@
     -webkit-filter: none !important;
     mix-blend-mode: normal !important;
   }
+
+  /* Render carousel artwork on the normal page-compositing path. Some browsers
+     can slightly alter image gamma when the whole slide strip is continuously
+     promoted to a transformed GPU layer. Reels keep their separate video path. */
+  .carousel-viewer,
+  .carousel-viewer-media,
+  .carousel-viewer-media .carousel-track,
+  .carousel-viewer-media .carousel-slide {
+    opacity: 1 !important;
+    filter: none !important;
+    -webkit-filter: none !important;
+    mix-blend-mode: normal !important;
+  }
+  .carousel-viewer-media .carousel-track {
+    transform: none !important;
+    will-change: auto !important;
+    transition: margin-left .35s ease;
+  }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -2606,7 +2624,7 @@
     post.currentSlide = (post.currentSlide + dir + post.slides.length) % post.slides.length;
     savePosts();
     const track = document.getElementById('viewer-track');
-    if (track) track.style.transform = `translateX(-${post.currentSlide * 100}%)`;
+    if (track) { track.style.transform = 'none'; track.style.marginLeft = `-${post.currentSlide * 100}%`; }
     document.querySelectorAll('.carousel-viewer-dots .dot').forEach((d, i) =>
       d.classList.toggle('active', i === post.currentSlide));
     const counter = document.getElementById('viewer-slide-counter');
@@ -2787,7 +2805,7 @@
     post.currentSlide = index;
     savePosts();
     const track = document.getElementById('track-' + post.id);
-    if (track) track.style.transform = `translateX(-${post.currentSlide * 100}%)`;
+    if (track) { track.style.transform = 'none'; track.style.marginLeft = `-${post.currentSlide * 100}%`; }
     const card = document.querySelector(`.post-card[data-id="${post.id}"]`);
     if (card) {
       card.querySelectorAll('.carousel-dots .dot').forEach((d, i) =>
@@ -3875,7 +3893,7 @@
     return `<div class="carousel-viewer">
       <div class="carousel-viewer-header"><div class="avatar">${post.avatar}</div><div class="post-header-info"><div class="username">${post.username}</div></div><button class="more-btn" onclick="closeViewer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
       <div class="carousel-viewer-media viewer-transition-target" ontouchstart="swipeStart(event)" ontouchend="viewerSwipeEnd(event,${id})">
-        <div class="carousel-track" id="viewer-track-${id}" style="transform:translateX(-${slideIndex * 100}%);">${slidesHtml}</div>
+        <div class="carousel-track" id="viewer-track-${id}" style="margin-left:-${slideIndex * 100}%;">${slidesHtml}</div>
         <div class="carousel-video-play" id="carousel-video-play-${id}" onclick="viewerCarouselTogglePlay(${id})" style="display:none"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
         <button class="carousel-video-mute" id="carousel-video-mute-${id}" onclick="viewerCarouselToggleMute(${id})" style="display:none">${soundIconSvg(globalMuted)}</button>
         ${post.slides.length > 1 ? `<button class="carousel-viewer-nav prev" onclick="viewerCarouselPrevSlide(${id})">‹</button><button class="carousel-viewer-nav next" onclick="viewerCarouselNextSlide(${id})">›</button><div class="carousel-viewer-dots" id="viewer-dots-${id}">${dots}</div><div class="slide-counter" id="viewer-slide-counter-${id}">${slideIndex + 1}/${post.slides.length}</div>` : ''}
@@ -3947,7 +3965,7 @@
     if (!post || post.slides.length <= 1) return;
     post.currentSlide = (post.currentSlide + direction + post.slides.length) % post.slides.length;
     const track = document.getElementById(`viewer-track-${postId}`);
-    if (track) track.style.transform = `translateX(-${post.currentSlide * 100}%)`;
+    if (track) { track.style.transform = 'none'; track.style.marginLeft = `-${post.currentSlide * 100}%`; }
     document.querySelectorAll(`#viewer-dots-${postId} .dot`).forEach((dot, index) => dot.classList.toggle('active', index === post.currentSlide));
     const counter = document.getElementById(`viewer-slide-counter-${postId}`);
     if (counter) counter.textContent = `${post.currentSlide + 1}/${post.slides.length}`;
@@ -4081,7 +4099,7 @@
     target.style.opacity = '0';
     document.body.appendChild(clone);
     requestAnimationFrame(() => requestAnimationFrame(() => positionTransitionClone(clone, endRect, innerWidth > 735 ? 6 : 0)));
-    setTimeout(() => { target.style.opacity = ''; clone.remove(); }, 300);
+    setTimeout(() => { target.style.opacity = '1'; clone.remove(); }, 300);
   }
 
   function openViewer(id, sourceElement = null) {
@@ -4163,7 +4181,7 @@
   function goToSlide(post, index) {
     post.currentSlide = index;
     const track = document.getElementById(`track-${post.id}`);
-    if (track) track.style.transform = `translateX(-${post.currentSlide * 100}%)`;
+    if (track) { track.style.transform = 'none'; track.style.marginLeft = `-${post.currentSlide * 100}%`; }
     const card = document.querySelector(`.post-card[data-id="${post.id}"]`);
     if (card) {
       card.querySelectorAll('.carousel-dots .dot').forEach((dot, i) => dot.classList.toggle('active', i === post.currentSlide));
