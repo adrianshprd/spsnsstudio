@@ -1244,8 +1244,10 @@
   .auth-message.success { color: #22c55e; }
   body.auth-locked #app { filter: blur(5px); pointer-events: none; user-select: none; }
 
-  /* Crop portrait photos instead of showing side bars. */
+  /* Preserve the complete carousel artwork in the opened Client View.
+     Reels still fill their vertical viewer, but carousel slides must never crop. */
   .carousel-viewer-media .carousel-slide img,
+  .carousel-viewer-media .carousel-slide video { object-fit: contain !important; }
   .reel-media-wrap img.reel-video { object-fit: cover !important; }
 
   @media (max-width: 700px) {
@@ -1403,7 +1405,7 @@
     .post-viewer-inner { width:auto; height:auto; max-width:100%; max-height:90vh; display:flex; align-items:center; justify-content:center; }
     .carousel-viewer { width:min(470px, calc(100vw - 48px)); height:min(820px, 90vh); border-radius:4px; box-shadow:0 24px 80px rgba(0,0,0,.42); animation:viewerOpen .18s cubic-bezier(.2,.75,.3,1) both; }
     .carousel-viewer-media { min-height:0; aspect-ratio:4/5; flex:0 1 auto; }
-    .carousel-viewer-media .carousel-slide img, .carousel-viewer-media .carousel-slide video { object-fit:cover; }
+    .carousel-viewer-media .carousel-slide img, .carousel-viewer-media .carousel-slide video { object-fit:contain; }
     .reel-viewer { width:min(430px, calc(100vw - 48px)); height:min(820px, 90vh); border-radius:10px; box-shadow:0 24px 80px rgba(0,0,0,.5); animation:viewerOpen .18s cubic-bezier(.2,.75,.3,1) both; }
   }
   @keyframes viewerOpen { from{opacity:0; transform:scale(.975) translateY(8px)} to{opacity:1; transform:scale(1) translateY(0)} }
