@@ -1793,6 +1793,34 @@
     }
   }
 
+
+  /* ===== MOBILE CLIENT VIEW: KEEP INSTAGRAM HEADER ATTACHED =====
+   * The Instagram handle/actions row must travel with the profile during the
+   * Shepherd utility-bar reveal/hide animation. Keeping it sticky caused the
+   * row and profile body to move on different compositing paths in mobile
+   * Safari, creating the visible drifting/parallax effect.
+   */
+  @media (max-width:735px) {
+    .client-view .ig-mobile-topbar,
+    .client-view.client-nav-hidden .ig-mobile-topbar {
+      position:sticky !important;
+      top:0 !important;
+      left:auto !important;
+      right:auto !important;
+      transform:none !important;
+      transition:none !important;
+      will-change:auto !important;
+      flex:0 0 44px;
+    }
+
+    /* Only this single container changes its top spacing. Because the
+       Instagram bar and profile are both children of #gallery, they rise and
+       return together as one continuous page—without independent motion. */
+    .client-view #gallery {
+      transition:padding-top .24s cubic-bezier(.2,.75,.3,1) !important;
+    }
+  }
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
