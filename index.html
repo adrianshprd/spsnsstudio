@@ -3562,25 +3562,29 @@
       if (!video.videoWidth || !video.videoHeight) throw new Error('This video cannot be decoded for a thumbnail.');
 
       const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
-      // Carousel covers favour speed: decode one frame only. Reels keep the smarter
-      // multi-frame scan so a fade-in or black opening is less likely to become the cover.
+      // Reel covers can be produced in three modes. The new quick mode checks only
+      // two early frames at a smaller output size. It is intended for background
+      // processing after the post itself is already visible.
       const rawTargets = mode === 'fast'
         ? [Math.min(.75, Math.max(.08, duration * .08))]
-        : [.35, .75, 1.25, duration * .08, duration * .2, duration * .42, duration * .65];
+        : mode === 'quick'
+          ? [.35, Math.min(1.05, Math.max(.55, duration * .12))]
+          : [.35, .75, 1.25, duration * .08, duration * .2, duration * .42, duration * .65];
       const targets = [...new Set(rawTargets.map(value => Math.max(.04, Math.min(Math.max(.04, duration - .04), value)).toFixed(3)))].map(Number);
+      const maxWidth = mode === 'quick' ? 560 : 900;
+      const jpegQuality = mode === 'quick' ? .8 : .86;
       let fallbackBlob = null;
 
       for (let i = 0; i < targets.length; i++) {
         await seekVideoForThumbnail(video, targets[i], signal);
         throwIfUploadCancelled(signal);
-        const maxWidth = 900;
         const scale = Math.min(1, maxWidth / Math.max(1, video.videoWidth));
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
         canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
         const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .86));
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', jpegQuality));
         if (!blob) continue;
         fallbackBlob = fallbackBlob || blob;
         if (!canvasLooksBlack(ctx, canvas.width, canvas.height)) {
@@ -3599,6 +3603,46 @@
       video.load();
       video.remove();
       URL.revokeObjectURL(objectUrl);
+    }
+  }
+
+  async function generateReelCoverInBackground(postId, sourceFile) {
+    // Cover generation must never hold the upload UI open. The Reel appears first
+    // using its uploaded video as a temporary grid preview, then this replaces it
+    // with a lightweight JPEG when the browser has finished decoding it.
+    try {
+      await new Promise(resolve => setTimeout(resolve, 120));
+      const postAtStart = posts.find(post => Number(post.id) === Number(postId));
+      if (!postAtStart || postAtStart.type !== 'reel' || postAtStart.isDemo) return;
+
+      const thumbnailFile = await createVideoThumbnail(sourceFile, null, 'quick');
+      if (!thumbnailFile) return;
+
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session?.user) return;
+      const thumbnailPath = `${session.user.id}/thumbnails/${Date.now()}-${crypto.randomUUID()}-reel.jpg`;
+      await uploadBinaryToSupabase(thumbnailPath, thumbnailFile, null, null);
+      const { data: thumbPublic } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(thumbnailPath);
+
+      const currentPost = posts.find(post => Number(post.id) === Number(postId));
+      if (!currentPost || currentPost.type !== 'reel') {
+        // The user may have deleted the Reel while its cover was processing.
+        supabaseClient.storage.from(SUPABASE_BUCKET).remove([thumbnailPath]).catch(() => {});
+        return;
+      }
+
+      const oldPath = currentPost.thumbnailStoragePath;
+      currentPost.thumbnail = thumbPublic.publicUrl;
+      currentPost.thumbnailStoragePath = thumbnailPath;
+      await savePosts();
+      if (oldPath && oldPath !== thumbnailPath) {
+        supabaseClient.storage.from(SUPABASE_BUCKET).remove([oldPath]).catch(() => {});
+      }
+      renderGallery();
+    } catch (error) {
+      // A failed background cover is non-fatal. The uploaded video remains usable
+      // and continues to act as the temporary grid preview.
+      console.warn('Background Reel cover generation failed:', error);
     }
   }
 
@@ -3670,11 +3714,10 @@
       for (let i = 0; i < fileArray.length; i++) {
         throwIfUploadCancelled(signal);
         const file = fileArray[i];
-        // Keep cover generation on the Reel path only. Carousel uploads must not
-        // wait for local video decoding/seeking; the grid can display slide 1's
-        // uploaded video directly as its live first-frame preview.
-        const generateThumbnail = isSingleVideoReel && file.type.startsWith('video/');
-        const thumbnailMode = 'smart';
+        // Never block the upload on cover extraction. Both Reel and carousel media
+        // upload immediately; Reel covers are generated after the post is saved.
+        const generateThumbnail = false;
+        const thumbnailMode = 'quick';
         const item = await uploadMediaFile(file, status => {
           if (status.phase === 'upload') {
             const withinFile = Math.max(0, Math.min(1, (status.loaded || 0) / Math.max(1, status.total || file.size || 1)));
@@ -3729,8 +3772,14 @@
       await savePosts();
       renderGallery();
       if (input) input.value = '';
-      setUploadProgress(100, 'Upload complete', `${fileArray.length} file${fileArray.length === 1 ? '' : 's'} ready`);
+      const backgroundReelCover = isSingleVideoReel && fileArray[0]?.type.startsWith('video/');
+      setUploadProgress(
+        100,
+        backgroundReelCover ? 'Reel uploaded' : 'Upload complete',
+        backgroundReelCover ? 'Cover finishing in the background' : `${fileArray.length} file${fileArray.length === 1 ? '' : 's'} ready`
+      );
       setTimeout(resetUploadProgress, 850);
+      if (backgroundReelCover) void generateReelCoverInBackground(id, fileArray[0]);
     } catch (error) {
       const cancelled = error?.name === 'AbortError' || uploadCancelRequested;
       if (cancelled) console.info('Upload cancelled.');
