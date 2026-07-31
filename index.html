@@ -274,23 +274,6 @@
     gap: 10px;
     flex-wrap: wrap;
   }
-  .export-build-btn {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    background: var(--card);
-    padding: 9px 16px;
-    border-radius: 24px;
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-size: 13px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-    transition: border-color 0.2s, color 0.2s;
-  }
-  .export-build-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .client-view .export-build-btn { display: none; }
   .client-toggle {
     display: flex;
     align-items: center;
@@ -1400,7 +1383,6 @@
   @media (min-width:736px) {
     .client-view .insta-app { max-width:100%; padding:0 24px 48px; }
     .client-view .header { max-width:975px; margin:0 auto 20px; min-height:64px; padding:10px 0; }
-    .client-view .header-actions .export-build-btn,
     .client-view .header-actions .client-toggle { display:none; }
     .client-view .main-content, .client-view #gallery, .client-view .profile-shell { max-width:935px; margin-left:auto; margin-right:auto; }
 
@@ -1716,14 +1698,6 @@
       <span class="brand-copy"><span class="brand-name">Shepherd SNS Studio</span><span class="brand-preview">Client Preview</span></span>
     </h1>
     <div class="header-actions">
-      <button class="export-build-btn" id="exportBuildBtn" onclick="exportClientBuild()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        Export client build
-      </button>
       <div class="client-toggle">
         <label>Client View</label>
         <div class="switch" id="clientSwitch" onclick="toggleClientMode()"></div>
@@ -2946,149 +2920,6 @@
 
   function exitClientView() {
     setClientMode(false);
-  }
-
-  /* ===== EXPORT CLIENT BUILD (ZIP package) =====
-   * Downloads a .zip containing index.html + media/ files.
-   * Uploaded media (base64 data URLs) is extracted into real files and
-   * referenced by relative paths, so the HTML stays small and fast —
-   * a 50MB single-file build chokes browsers; a folder does not.
-   * Deploy: unzip, drag the folder onto Netlify Drop (or any static host).
-   * (When Option 3 lands, this becomes "Publish" via the STORAGE swap.) */
-  const EXPORT_MIME_EXT = {
-    'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/webm': '.webm',
-    'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif'
-  };
-
-  function dataUrlToBytes(dataUrl) {
-    const comma = dataUrl.indexOf(',');
-    const mime = dataUrl.slice(5, comma).split(';')[0];
-    const bin = atob(dataUrl.slice(comma + 1));
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return { mime, bytes };
-  }
-
-  const CRC_TABLE = (() => {
-    const t = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-      let c = n;
-      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-      t[n] = c >>> 0;
-    }
-    return t;
-  })();
-
-  function crc32(bytes) {
-    let c = 0xFFFFFFFF;
-    for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
-    return (c ^ 0xFFFFFFFF) >>> 0;
-  }
-
-  // Minimal ZIP writer (STORE method — media is already compressed)
-  function buildZip(entries) {
-    const enc = new TextEncoder();
-    const chunks = [];
-    const central = [];
-    let offset = 0;
-    entries.forEach(e => {
-      const nameBytes = enc.encode(e.name);
-      const crc = crc32(e.bytes);
-      const lh = new DataView(new ArrayBuffer(30));
-      lh.setUint32(0, 0x04034b50, true);
-      lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); // UTF-8 names
-      lh.setUint32(14, crc, true);
-      lh.setUint32(18, e.bytes.length, true); lh.setUint32(22, e.bytes.length, true);
-      lh.setUint16(26, nameBytes.length, true);
-      chunks.push(new Uint8Array(lh.buffer), nameBytes, e.bytes);
-      central.push({ nameBytes, crc, size: e.bytes.length, offset });
-      offset += 30 + nameBytes.length + e.bytes.length;
-    });
-    const cdStart = offset;
-    central.forEach(c => {
-      const ch = new DataView(new ArrayBuffer(46));
-      ch.setUint32(0, 0x02014b50, true);
-      ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
-      ch.setUint32(16, c.crc, true);
-      ch.setUint32(20, c.size, true); ch.setUint32(24, c.size, true);
-      ch.setUint16(28, c.nameBytes.length, true);
-      ch.setUint32(42, c.offset, true);
-      chunks.push(new Uint8Array(ch.buffer), c.nameBytes);
-      offset += 46 + c.nameBytes.length;
-    });
-    const eocd = new DataView(new ArrayBuffer(22));
-    eocd.setUint32(0, 0x06054b50, true);
-    eocd.setUint16(8, entries.length, true); eocd.setUint16(10, entries.length, true);
-    eocd.setUint32(12, offset - cdStart, true); eocd.setUint32(16, cdStart, true);
-    chunks.push(new Uint8Array(eocd.buffer));
-    return new Blob(chunks, { type: 'application/zip' });
-  }
-
-  function exportClientBuild() {
-    // 1) clone posts, extracting data-URL media into real files
-    const files = [];
-    const cache = {};
-    let counter = 0;
-    const extract = (url) => {
-      if (typeof url !== 'string' || !url.startsWith('data:')) return url;
-      if (cache[url]) return cache[url];
-      const { mime, bytes } = dataUrlToBytes(url);
-      const name = 'media/media-' + (++counter) + (EXPORT_MIME_EXT[mime] || '.bin');
-      files.push({ name, bytes });
-      cache[url] = name;
-      return name;
-    };
-    const cloned = JSON.parse(JSON.stringify(posts));
-    cloned.forEach(p => {
-      if (p.videoUrl) p.videoUrl = extract(p.videoUrl);
-      if (p.thumbnail) p.thumbnail = extract(p.thumbnail);
-      if (Array.isArray(p.slides)) {
-        p.slides = p.slides.map(s =>
-          (s && typeof s === 'object' && s.url)
-            ? Object.assign({}, s, { url: extract(s.url) })
-            : extract(s));
-      }
-    });
-
-    // 2) build the HTML snapshot with the (now small) posts baked in
-    // NOTE: needle/tag strings are built by concatenation so this
-    // function's own source never contains a literal script-open or
-    // body-close tag — otherwise the replaces below would match inside
-    // the script text and corrupt the exported file.
-    const OPEN_SCRIPT = '<scr' + 'ipt>';
-    const CLOSE_BODY = '</bo' + 'dy>';
-    const injector =
-      '<scr' + 'ipt>window.__EXPORTED_POSTS__=' +
-      JSON.stringify(cloned).replace(/</g, '\\u003c') +
-      ';</scr' + 'ipt>';
-    const hardHide =
-      '<style>.upload-zone,.tabs,.header-actions{display:none!important}</style>';
-    const forceClient =
-      '<scr' + 'ipt>(function(){' +
-      'try{if(!clientMode)toggleClientMode();}catch(e){' +
-      'var app=document.getElementById("app");if(app)app.classList.add("client-view");}' +
-      '})();</scr' + 'ipt>';
-
-    // Strip the live-rendered gallery before serializing — its markup
-    // contains full data-URL copies of every media item. The exported
-    // app re-renders from the baked posts on boot anyway.
-    const galleryEl = document.getElementById('gallery');
-    if (galleryEl) galleryEl.innerHTML = '';
-    let html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
-    if (galleryEl) renderGallery();
-    html = html.replace(OPEN_SCRIPT, injector + '\n' + OPEN_SCRIPT); // seed storage before app boots
-    html = html.replace(CLOSE_BODY, hardHide + '\n' + forceClient + '\n' + CLOSE_BODY);
-
-    // 3) package index.html + media into a zip
-    files.unshift({ name: 'index.html', bytes: new TextEncoder().encode(html) });
-    const zip = buildZip(files);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(zip);
-    a.download = 'shepherd-sns-client-build.zip';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   }
 
   async function handleFiles(files) {
