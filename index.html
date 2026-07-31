@@ -3670,9 +3670,11 @@
       for (let i = 0; i < fileArray.length; i++) {
         throwIfUploadCancelled(signal);
         const file = fileArray[i];
-        // A Reel needs a cover. A carousel only needs a generated cover when slide 1 is a video.
-        const generateThumbnail = file.type.startsWith('video/') && (isSingleVideoReel || i === 0);
-        const thumbnailMode = isSingleVideoReel ? 'smart' : 'fast';
+        // Keep cover generation on the Reel path only. Carousel uploads must not
+        // wait for local video decoding/seeking; the grid can display slide 1's
+        // uploaded video directly as its live first-frame preview.
+        const generateThumbnail = isSingleVideoReel && file.type.startsWith('video/');
+        const thumbnailMode = 'smart';
         const item = await uploadMediaFile(file, status => {
           if (status.phase === 'upload') {
             const withinFile = Math.max(0, Math.min(1, (status.loaded || 0) / Math.max(1, status.total || file.size || 1)));
