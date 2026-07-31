@@ -1470,6 +1470,16 @@
   .grid-cell > img,.grid-cell > video,.grid-cell > .video-thumb-placeholder { position:relative; z-index:1; }
   .video-thumb-placeholder { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:linear-gradient(145deg,#161616,#323232); color:#fff; font-size:11px; }
   .video-thumb-placeholder svg { width:28px; height:28px; }
+  .video-thumb-placeholder.carousel-thumb-pending {
+    position:relative;
+    z-index:1;
+    background:
+      radial-gradient(circle at 50% 42%, rgba(255,255,255,.10), transparent 34%),
+      linear-gradient(145deg,#171717,#292929);
+  }
+  .video-thumb-placeholder.carousel-thumb-pending span { font-weight:600; letter-spacing:.01em; }
+  .video-thumb-placeholder.carousel-thumb-pending small { color:rgba(255,255,255,.62); font-size:9px; }
+  .carousel-grid-video { opacity:1 !important; filter:none !important; background:#111; }
   @keyframes gridSkeleton { to { background-position:-220% 0; } }
 
   .post-viewer { opacity:0; pointer-events:none; transition:opacity .2s ease; }
@@ -3292,6 +3302,54 @@
     } catch (_) {}
   }
 
+  function primeCarouselGridVideo(video) {
+    // Mobile Safari often leaves a paused remote video black until it has actually
+    // decoded and presented a frame. Let the muted video play very briefly, then
+    // freeze it. This is only a temporary grid preview while the JPEG cover is
+    // generated in the background.
+    if (!video || video.dataset.previewPrimed === '1') return;
+    video.dataset.previewPrimed = '1';
+    video.muted = true;
+    video.playsInline = true;
+
+    let finished = false;
+    let fallbackTimer = null;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      try { video.pause(); } catch (_) {}
+      markGridMediaLoaded(video);
+    };
+
+    const seekAndFinish = () => {
+      try {
+        if (Number.isFinite(video.duration) && video.duration > 0) {
+          const target = Math.min(0.32, Math.max(0.08, video.duration * 0.04));
+          if (Math.abs((video.currentTime || 0) - target) > 0.03) {
+            video.addEventListener('seeked', finish, { once: true });
+            video.currentTime = target;
+            return;
+          }
+        }
+      } catch (_) {}
+      finish();
+    };
+
+    video.addEventListener('playing', () => setTimeout(finish, 160), { once: true });
+    video.addEventListener('timeupdate', () => setTimeout(finish, 80), { once: true });
+    fallbackTimer = setTimeout(seekAndFinish, 1800);
+
+    try {
+      const playAttempt = video.play();
+      if (playAttempt && typeof playAttempt.catch === 'function') {
+        playAttempt.catch(seekAndFinish);
+      }
+    } catch (_) {
+      seekAndFinish();
+    }
+  }
+
 
 
   /* ============================================================
@@ -3567,12 +3625,16 @@
       // processing after the post itself is already visible.
       const rawTargets = mode === 'fast'
         ? [Math.min(.75, Math.max(.08, duration * .08))]
-        : mode === 'quick'
-          ? [.35, Math.min(1.05, Math.max(.55, duration * .12))]
-          : [.35, .75, 1.25, duration * .08, duration * .2, duration * .42, duration * .65];
+        : mode === 'carousel'
+          // Carousel covers are generated only after the post has already saved.
+          // Try one very early frame, then one fallback only when that frame is black.
+          ? [.28, Math.min(.8, Math.max(.42, duration * .08))]
+          : mode === 'quick'
+            ? [.35, Math.min(1.05, Math.max(.55, duration * .12))]
+            : [.35, .75, 1.25, duration * .08, duration * .2, duration * .42, duration * .65];
       const targets = [...new Set(rawTargets.map(value => Math.max(.04, Math.min(Math.max(.04, duration - .04), value)).toFixed(3)))].map(Number);
-      const maxWidth = mode === 'quick' ? 560 : 900;
-      const jpegQuality = mode === 'quick' ? .8 : .86;
+      const maxWidth = mode === 'carousel' ? 480 : (mode === 'quick' ? 560 : 900);
+      const jpegQuality = mode === 'carousel' ? .76 : (mode === 'quick' ? .8 : .86);
       let fallbackBlob = null;
 
       for (let i = 0; i < targets.length; i++) {
@@ -3646,6 +3708,52 @@
     }
   }
 
+  async function generateCarouselCoverInBackground(postId, sourceFile, preparedThumbnailPromise = null) {
+    // The post is saved immediately. Cover extraction starts as early as possible
+    // and runs in parallel with the upload, so users usually never see the temporary
+    // live-video preview. If it takes longer, the preview remains usable instead of
+    // falling back to a generic placeholder.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 28000);
+    try {
+      const postAtStart = posts.find(post => Number(post.id) === Number(postId));
+      const firstAtStart = postAtStart?.slides?.[0];
+      if (!postAtStart || postAtStart.type !== 'carousel' || postAtStart.isDemo || firstAtStart?.type !== 'video') return;
+
+      const thumbnailFile = await (preparedThumbnailPromise || createVideoThumbnail(sourceFile, controller.signal, 'carousel'));
+      if (!thumbnailFile) return;
+
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session?.user) return;
+      const thumbnailPath = `${session.user.id}/thumbnails/${Date.now()}-${crypto.randomUUID()}-carousel.jpg`;
+      await uploadBinaryToSupabase(thumbnailPath, thumbnailFile, null, controller.signal);
+      const { data: thumbPublic } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(thumbnailPath);
+
+      const currentPost = posts.find(post => Number(post.id) === Number(postId));
+      const currentFirst = currentPost?.slides?.[0];
+      if (!currentPost || currentPost.type !== 'carousel' || currentFirst?.type !== 'video') {
+        supabaseClient.storage.from(SUPABASE_BUCKET).remove([thumbnailPath]).catch(() => {});
+        return;
+      }
+
+      const oldPath = currentFirst.thumbnailPath;
+      currentPost.slides[0] = {
+        ...currentFirst,
+        thumbnailUrl: thumbPublic.publicUrl,
+        thumbnailPath
+      };
+      await savePosts();
+      if (oldPath && oldPath !== thumbnailPath) {
+        supabaseClient.storage.from(SUPABASE_BUCKET).remove([oldPath]).catch(() => {});
+      }
+      renderGallery();
+    } catch (error) {
+      if (error?.name !== 'AbortError') console.warn('Background carousel cover generation failed:', error);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   async function uploadMediaFile(file, onStatus, options = {}) {
     const { generateThumbnail = true, thumbnailMode = 'smart', signal = currentUploadController?.signal, onPath } = options;
     throwIfUploadCancelled(signal);
@@ -3701,6 +3809,11 @@
     const uploadedItems = [];
     const createdPaths = [];
     const isSingleVideoReel = fileArray.length === 1 && fileArray[0].type.startsWith('video/');
+    const shouldPrepareCarouselCover = !isSingleVideoReel && fileArray[0]?.type.startsWith('video/');
+    // Start decoding Slide 1 while the media files are uploading. This keeps cover
+    // generation off the critical path and greatly shortens the time before the
+    // real grid thumbnail appears on mobile.
+    let preparedCarouselCoverPromise = null;
     uploadInProgress = true;
     uploadCancelRequested = false;
     currentUploadController = new AbortController();
@@ -3709,6 +3822,12 @@
     if (input) input.disabled = true;
     setUploadCancelable(true);
     setUploadProgress(2, 'Preparing media…', `${fileArray.length} file${fileArray.length === 1 ? '' : 's'}`);
+    if (shouldPrepareCarouselCover) {
+      preparedCarouselCoverPromise = createVideoThumbnail(fileArray[0], signal, 'carousel').catch(error => {
+        if (error?.name !== 'AbortError') console.warn('Early carousel cover preparation failed:', error);
+        return null;
+      });
+    }
 
     try {
       for (let i = 0; i < fileArray.length; i++) {
@@ -3773,13 +3892,16 @@
       renderGallery();
       if (input) input.value = '';
       const backgroundReelCover = isSingleVideoReel && fileArray[0]?.type.startsWith('video/');
+      const backgroundCarouselCover = !isSingleVideoReel && uploadedItems[0]?.mediaType === 'video';
+      const backgroundCover = backgroundReelCover || backgroundCarouselCover;
       setUploadProgress(
         100,
-        backgroundReelCover ? 'Reel uploaded' : 'Upload complete',
-        backgroundReelCover ? 'Cover finishing in the background' : `${fileArray.length} file${fileArray.length === 1 ? '' : 's'} ready`
+        backgroundReelCover ? 'Reel uploaded' : (backgroundCarouselCover ? 'Carousel uploaded' : 'Upload complete'),
+        backgroundCover ? 'Cover finishing in the background' : `${fileArray.length} file${fileArray.length === 1 ? '' : 's'} ready`
       );
       setTimeout(resetUploadProgress, 850);
       if (backgroundReelCover) void generateReelCoverInBackground(id, fileArray[0]);
+      if (backgroundCarouselCover) void generateCarouselCoverInBackground(id, fileArray[0], preparedCarouselCoverPromise);
     } catch (error) {
       const cancelled = error?.name === 'AbortError' || uploadCancelRequested;
       if (cancelled) console.info('Upload cancelled.');
@@ -3829,16 +3951,21 @@
       badge = `<div class="grid-views"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>${post.views || ''}</div>`;
     } else {
       const first = primarySlideInfo(post);
+      let cellReadyClass = '';
       if (first.type === 'video' && first.thumbnailUrl) {
         media = `<img src="${first.thumbnailUrl}" alt="post thumbnail" ${commonImg} onload="markGridMediaLoaded(this)">`;
       } else if (first.type === 'video') {
-        media = `<video src="${first.url}" muted playsinline preload="metadata" crossorigin="anonymous" onloadeddata="primeVideoPreview(this);markGridMediaLoaded(this)" onerror="handleBrokenMedia(event,${post.id})"></video>`;
+        // Use the real first-slide video as a temporary preview instead of showing
+        // a generic placeholder. It autoplays muted for a fraction of a second so
+        // iOS presents a frame, then freezes. A JPEG cover replaces it when ready.
+        media = `<video class="carousel-grid-video" src="${first.url}" muted autoplay playsinline webkit-playsinline preload="auto" crossorigin="anonymous" onloadeddata="primeCarouselGridVideo(this)" oncanplay="primeCarouselGridVideo(this)" onerror="handleBrokenMedia(event,${post.id})"></video>`;
       } else {
         media = `<img src="${first.url}" alt="post" ${commonImg} onload="markGridMediaLoaded(this)">`;
       }
       if (post.slides.length > 1) {
         badge = `<div class="grid-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="2" width="14" height="14" rx="2" fill="rgba(0,0,0,0.35)"/><path d="M4 6v14a2 2 0 0 0 2 2h14"/></svg></div>`;
       }
+      return `<div class="grid-cell${cellReadyClass}" data-post-id="${post.id}" onclick="openViewer(${post.id},this)">${media}${badge}</div>`;
     }
 
     return `<div class="grid-cell" data-post-id="${post.id}" onclick="openViewer(${post.id},this)">${media}${badge}</div>`;
