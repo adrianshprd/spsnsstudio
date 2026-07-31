@@ -1300,7 +1300,23 @@
 
   @media (max-width: 735px) {
     .client-view header { display:none; }
-    .ig-mobile-topbar { display:flex; }
+    .ig-mobile-topbar {
+      display:flex;
+      position:fixed;
+      top:0;
+      left:0;
+      right:0;
+      width:100%;
+      z-index:120;
+      transform:translateY(0);
+    }
+    /* Reserve space only while the mobile bar is visible, so the whole
+       profile rises naturally when it minimises—matching Instagram. */
+    .client-view #gallery {
+      padding-top:44px;
+      transition:padding-top .24s cubic-bezier(.2,.75,.3,1);
+    }
+    .client-view.client-nav-hidden #gallery { padding-top:0; }
     .client-view .main-content { width:100%; padding:0; }
     .profile-header { padding: 0; }
     .profile-top { gap: 0; max-width:none; padding: 14px 16px 0; align-items:center; }
@@ -1471,10 +1487,6 @@
   }
   .viewer-feed-item .carousel-viewer,
   .viewer-feed-item .reel-viewer { flex:0 0 auto; }
-  .viewer-feed-position {
-    position:absolute; right:12px; top:50%; transform:translateY(-50%); z-index:60; color:rgba(255,255,255,.7);
-    font-size:10px; font-variant-numeric:tabular-nums; text-shadow:0 1px 4px rgba(0,0,0,.7); pointer-events:none;
-  }
   .viewer-transition-target { transition:opacity .12s ease; }
   .viewer-transition-clone {
     position:fixed; z-index:10050; margin:0; padding:0; overflow:hidden; pointer-events:none; background:#000;
@@ -1509,7 +1521,6 @@
   @media (max-width:735px) {
     .viewer-feed-item { min-height:100dvh; padding:0; align-items:flex-start; }
     .viewer-feed-item .carousel-viewer,.viewer-feed-item .reel-viewer { width:100%; min-height:100dvh; height:100dvh; border-radius:0; }
-    .viewer-feed-position { right:8px; top:52px; transform:none; }
     .viewer-neighbour-hint { bottom:8px; }
     .client-view .header { top:0; }
   }
@@ -3145,6 +3156,7 @@
   let cloudRefreshTimer = 0;
   let clientNavLastY = 0;
   let clientTouchStartY = 0;
+  let clientNavAutoHideTimer = null;
   let thumbnailRepairing = new Set();
   let ghostChecks = new Set();
 
@@ -3694,7 +3706,7 @@
   }
 
   function renderViewerFeedItem(post, index, total) {
-    return `<section class="viewer-feed-item" data-post-id="${post.id}">${post.type === 'reel' ? renderReelViewer(post) : renderCarouselViewer(post)}<div class="viewer-feed-position">${index + 1}/${total}</div></section>`;
+    return `<section class="viewer-feed-item" data-post-id="${post.id}">${post.type === 'reel' ? renderReelViewer(post) : renderCarouselViewer(post)}</section>`;
   }
 
   function renderReelViewer(post) {
@@ -4170,8 +4182,25 @@
     setupRealtimeSync();
   }
 
-  function revealClientNav() {
+  function clearClientNavAutoHide() {
+    if (clientNavAutoHideTimer) {
+      clearTimeout(clientNavAutoHideTimer);
+      clientNavAutoHideTimer = null;
+    }
+  }
+
+  function scheduleClientNavAutoHide(delay = 1500) {
+    clearClientNavAutoHide();
+    if (!clientMode || window.matchMedia('(min-width:736px)').matches) return;
+    clientNavAutoHideTimer = setTimeout(() => {
+      if (!clientMode || document.getElementById('postViewer')?.classList.contains('active')) return;
+      document.getElementById('app')?.classList.add('client-nav-hidden');
+    }, delay);
+  }
+
+  function revealClientNav(autoHide = true) {
     document.getElementById('app')?.classList.remove('client-nav-hidden');
+    if (autoHide) scheduleClientNavAutoHide(1800);
   }
 
   function handleClientWindowScroll() {
@@ -4179,8 +4208,11 @@
     const y = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
     const delta = y - clientNavLastY;
     const app = document.getElementById('app');
-    if (y < 24 || delta < -7) app?.classList.remove('client-nav-hidden');
-    else if (delta > 8 && y > 72) app?.classList.add('client-nav-hidden');
+    if (y < 24 || delta < -7) revealClientNav(true);
+    else if (delta > 8 && y > 72) {
+      clearClientNavAutoHide();
+      app?.classList.add('client-nav-hidden');
+    }
     clientNavLastY = y;
   }
 
@@ -4196,7 +4228,9 @@
       backButton.setAttribute('aria-hidden', clientMode ? 'false' : 'true');
     }
     clientNavLastY = window.scrollY || 0;
+    clearClientNavAutoHide();
     renderGallery();
+    if (clientMode) scheduleClientNavAutoHide(1500);
   }
 
   window.addEventListener('scroll', handleClientWindowScroll, { passive:true });
