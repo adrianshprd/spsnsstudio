@@ -1751,19 +1751,28 @@
     .client-view .header .auth-user,
     .client-view .header #signOutBtn { display:none !important; }
 
-    /* Keep Instagram's own mobile bar visible. It shifts up only when the
-       Shepherd utility bar minimises. */
+    /* Instagram's own top bar stays physically attached to the profile.
+       It remains in normal document flow and becomes sticky while scrolling,
+       so the handle/actions and profile move as one unit when the Shepherd
+       utility bar minimises—without a separate parallax-like slide. */
     .client-view .ig-mobile-topbar {
       display:flex;
-      position:fixed;
+      position:sticky;
       top:var(--client-utility-height);
+      align-self:start;
       transform:none !important;
       transition:top .24s cubic-bezier(.2,.75,.3,1);
       z-index:150;
     }
     .client-view #gallery {
-      padding-top:calc(var(--client-utility-height) + 44px);
+      padding-top:var(--client-utility-height);
+      overflow-x:clip;
+      overflow-y:visible;
       transition:padding-top .24s cubic-bezier(.2,.75,.3,1);
+    }
+    .insta-app.client-view {
+      overflow-x:clip;
+      overflow-y:visible;
     }
 
     .client-view.client-nav-hidden .header {
@@ -1774,7 +1783,7 @@
       top:0;
       transform:none !important;
     }
-    .client-view.client-nav-hidden #gallery { padding-top:44px; }
+    .client-view.client-nav-hidden #gallery { padding-top:0; }
 
     /* The desktop-only Back to Studio control must not take part in the
        mobile utility-bar animation. */
