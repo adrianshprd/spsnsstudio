@@ -1665,6 +1665,125 @@
     will-change: auto !important;
     transition: margin-left .35s ease;
   }
+
+
+  /* ===== CLIENT VIEW MOBILE UTILITY BAR BEHAVIOUR =====
+   * The Shepherd SNS Studio / Client Preview utility bar is the element that
+   * briefly appears and then minimises. The Instagram profile top bar remains
+   * visible and moves to the top together with the profile content.
+   */
+  @media (max-width:735px) {
+    .insta-app.client-view {
+      --client-utility-height: 64px;
+    }
+
+    .client-view .header {
+      display:flex;
+      position:fixed;
+      top:0;
+      left:0;
+      right:0;
+      width:100%;
+      height:var(--client-utility-height);
+      min-height:var(--client-utility-height);
+      z-index:180;
+      margin:0;
+      padding:8px 12px;
+      border-bottom:1px solid var(--border);
+      flex-wrap:nowrap;
+      gap:8px;
+      background:color-mix(in srgb,var(--bg) 94%,transparent);
+      box-shadow:0 1px 8px rgba(0,0,0,.04);
+      backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);
+      transform:translateY(0);
+      opacity:1;
+    }
+    .client-view .header h1 {
+      min-width:0;
+      flex:1 1 auto;
+      gap:8px;
+      font-size:12px;
+      letter-spacing:.035em;
+      white-space:nowrap;
+      overflow:hidden;
+    }
+    .client-view .header .sheep-icon {
+      width:36px;
+      height:36px;
+      border-radius:8px;
+    }
+    .client-view .header .brand-copy {
+      min-width:0;
+      overflow:hidden;
+    }
+    .client-view .header .brand-name,
+    .client-view .header .brand-preview {
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .client-view .header .brand-name { font-size:12px; }
+    .client-view .header .brand-preview { margin-top:3px; font-size:8px; }
+    .client-view .header-actions {
+      width:auto;
+      min-width:0;
+      flex:0 0 auto;
+      flex-wrap:nowrap;
+      gap:7px;
+    }
+    .client-view .header-actions .client-toggle {
+      display:flex;
+      padding:6px 8px;
+      gap:6px;
+      white-space:nowrap;
+    }
+    .client-view .header-actions .client-toggle label { font-size:11px; }
+    .client-view .header-actions .switch { width:38px; height:22px; }
+    .client-view .header-actions .switch::after { width:18px; height:18px; }
+    .client-view .header-actions .switch.on::after { transform:translateX(16px); }
+    .client-view .header .shepherd-theme-toggle {
+      width:36px;
+      height:36px;
+      min-height:36px;
+      flex:0 0 36px;
+    }
+    .client-view .header .auth-user,
+    .client-view .header #signOutBtn { display:none !important; }
+
+    /* Keep Instagram's own mobile bar visible. It shifts up only when the
+       Shepherd utility bar minimises. */
+    .client-view .ig-mobile-topbar {
+      display:flex;
+      position:fixed;
+      top:var(--client-utility-height);
+      transform:none !important;
+      transition:top .24s cubic-bezier(.2,.75,.3,1);
+      z-index:150;
+    }
+    .client-view #gallery {
+      padding-top:calc(var(--client-utility-height) + 44px);
+      transition:padding-top .24s cubic-bezier(.2,.75,.3,1);
+    }
+
+    .client-view.client-nav-hidden .header {
+      transform:translateY(calc(-100% - 2px));
+      opacity:0;
+    }
+    .client-view.client-nav-hidden .ig-mobile-topbar {
+      top:0;
+      transform:none !important;
+    }
+    .client-view.client-nav-hidden #gallery { padding-top:44px; }
+
+    /* The desktop-only Back to Studio control must not take part in the
+       mobile utility-bar animation. */
+    .client-view.client-nav-hidden .client-back-btn {
+      transform:none;
+      opacity:1;
+    }
+  }
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -4204,7 +4323,7 @@
   }
 
   function handleClientWindowScroll() {
-    if (!clientMode || document.getElementById('postViewer').classList.contains('active')) return;
+    if (!clientMode || window.matchMedia('(min-width:736px)').matches || document.getElementById('postViewer').classList.contains('active')) return;
     const y = Math.max(0, window.scrollY || document.documentElement.scrollTop || 0);
     const delta = y - clientNavLastY;
     const app = document.getElementById('app');
@@ -4236,7 +4355,7 @@
   window.addEventListener('scroll', handleClientWindowScroll, { passive:true });
   window.addEventListener('touchstart', event => { clientTouchStartY = event.touches?.[0]?.clientY || 0; }, { passive:true });
   window.addEventListener('touchmove', event => {
-    if (!clientMode) return;
+    if (!clientMode || window.matchMedia('(min-width:736px)').matches) return;
     const y = event.touches?.[0]?.clientY || 0;
     if (y - clientTouchStartY > 24) revealClientNav();
   }, { passive:true });
