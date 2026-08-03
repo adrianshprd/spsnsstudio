@@ -3600,6 +3600,69 @@
     throwIfUploadCancelled(signal);
   }
 
+  async function waitForFirstDecodedFrame(video, signal = currentUploadController?.signal) {
+    throwIfUploadCancelled(signal);
+
+    // Mobile Safari may report loadeddata before it has painted a frame that canvas
+    // can capture. Brief muted playback asks the decoder for exactly the first
+    // displayable frame; there is no timeline seek or multi-frame scan.
+    if ('requestVideoFrameCallback' in video) {
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        let frameHandle = null;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          signal?.removeEventListener('abort', abort);
+          resolve();
+        };
+        const abort = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          signal?.removeEventListener('abort', abort);
+          reject(createUploadAbortError());
+        };
+        const timer = setTimeout(finish, 1200);
+        signal?.addEventListener('abort', abort, { once: true });
+        try { frameHandle = video.requestVideoFrameCallback(finish); }
+        catch (_) { finish(); }
+        try {
+          const playAttempt = video.play();
+          if (playAttempt && typeof playAttempt.catch === 'function') playAttempt.catch(finish);
+        } catch (_) { finish(); }
+      });
+      video.pause();
+    } else {
+      try {
+        const playAttempt = video.play();
+        if (playAttempt && typeof playAttempt.catch === 'function') await playAttempt.catch(() => {});
+      } catch (_) {}
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, 90);
+        const abort = () => { clearTimeout(timer); reject(createUploadAbortError()); };
+        signal?.addEventListener('abort', abort, { once: true });
+      });
+      video.pause();
+    }
+
+    throwIfUploadCancelled(signal);
+  }
+
+  async function captureCurrentVideoFrame(video, signal = currentUploadController?.signal, maxWidth = 560, jpegQuality = .8) {
+    throwIfUploadCancelled(signal);
+    const scale = Math.min(1, maxWidth / Math.max(1, video.videoWidth));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const ctx = canvas.getContext('2d', { alpha: false });
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', jpegQuality));
+    throwIfUploadCancelled(signal);
+    return blob ? new File([blob], `thumbnail-${Date.now()}.jpg`, { type: 'image/jpeg' }) : null;
+  }
+
   async function createVideoThumbnail(file, signal = currentUploadController?.signal, mode = 'smart') {
     const video = document.createElement('video');
     const objectUrl = URL.createObjectURL(file);
@@ -3618,6 +3681,11 @@
       if (video.readyState < 2) await waitForVideoEvent(video, 'loadeddata', 7000, signal);
       throwIfUploadCancelled(signal);
       if (!video.videoWidth || !video.videoHeight) throw new Error('This video cannot be decoded for a thumbnail.');
+
+      if (mode === 'first') {
+        await waitForFirstDecodedFrame(video, signal);
+        return await captureCurrentVideoFrame(video, signal, 560, .8);
+      }
 
       const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
       // Reel covers can be produced in three modes. The new quick mode checks only
@@ -3754,6 +3822,58 @@
     }
   }
 
+  async function prepareFirstFrameCover(file, kind, signal = currentUploadController?.signal, onPath) {
+    try {
+      const thumbnailFile = await createVideoThumbnail(file, signal, 'first');
+      if (!thumbnailFile) return null;
+      throwIfUploadCancelled(signal);
+
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session?.user) throw new Error('Please sign in before uploading.');
+      const thumbnailPath = `${session.user.id}/thumbnails/${Date.now()}-${crypto.randomUUID()}-${kind}-first-frame.jpg`;
+      await uploadBinaryToSupabase(thumbnailPath, thumbnailFile, null, signal);
+      onPath?.(thumbnailPath);
+      const { data: thumbPublic } = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(thumbnailPath);
+      return { thumbnailUrl: thumbPublic.publicUrl, thumbnailPath };
+    } catch (error) {
+      if (error?.name === 'AbortError') throw error;
+      console.warn('Fast first-frame cover failed:', error);
+      return null;
+    }
+  }
+
+  async function applyPreparedCoverToSavedPost(postId, postType, coverPromise) {
+    try {
+      const cover = await coverPromise;
+      if (!cover?.thumbnailUrl) return;
+
+      const currentPost = posts.find(post => Number(post.id) === Number(postId));
+      if (!currentPost || currentPost.type !== postType) {
+        if (cover.thumbnailPath) supabaseClient.storage.from(SUPABASE_BUCKET).remove([cover.thumbnailPath]).catch(() => {});
+        return;
+      }
+
+      if (postType === 'reel') {
+        if (currentPost.thumbnailStoragePath === cover.thumbnailPath) return;
+        currentPost.thumbnail = cover.thumbnailUrl;
+        currentPost.thumbnailStoragePath = cover.thumbnailPath;
+      } else {
+        const first = currentPost.slides?.[0];
+        if (!first || first.type !== 'video' || first.thumbnailPath === cover.thumbnailPath) return;
+        currentPost.slides[0] = {
+          ...first,
+          thumbnailUrl: cover.thumbnailUrl,
+          thumbnailPath: cover.thumbnailPath
+        };
+      }
+
+      await savePosts();
+      renderGallery();
+    } catch (error) {
+      if (error?.name !== 'AbortError') console.warn('Could not attach the prepared cover:', error);
+    }
+  }
+
   async function uploadMediaFile(file, onStatus, options = {}) {
     const { generateThumbnail = true, thumbnailMode = 'smart', signal = currentUploadController?.signal, onPath } = options;
     throwIfUploadCancelled(signal);
@@ -3809,11 +3929,11 @@
     const uploadedItems = [];
     const createdPaths = [];
     const isSingleVideoReel = fileArray.length === 1 && fileArray[0].type.startsWith('video/');
-    const shouldPrepareCarouselCover = !isSingleVideoReel && fileArray[0]?.type.startsWith('video/');
-    // Start decoding Slide 1 while the media files are uploading. This keeps cover
-    // generation off the critical path and greatly shortens the time before the
-    // real grid thumbnail appears on mobile.
-    let preparedCarouselCoverPromise = null;
+    const firstFileIsVideo = Boolean(fileArray[0]?.type.startsWith('video/'));
+    const postType = isSingleVideoReel ? 'reel' : 'carousel';
+    let preparedCoverResult = null;
+    let preparedCoverSettled = !firstFileIsVideo;
+
     uploadInProgress = true;
     uploadCancelRequested = false;
     currentUploadController = new AbortController();
@@ -3821,37 +3941,36 @@
     zone?.classList.add('uploading', 'dragover');
     if (input) input.disabled = true;
     setUploadCancelable(true);
-    setUploadProgress(2, 'Preparing media…', `${fileArray.length} file${fileArray.length === 1 ? '' : 's'}`);
-    if (shouldPrepareCarouselCover) {
-      preparedCarouselCoverPromise = createVideoThumbnail(fileArray[0], signal, 'carousel').catch(error => {
-        if (error?.name !== 'AbortError') console.warn('Early carousel cover preparation failed:', error);
-        return null;
-      });
-    }
+    setUploadProgress(2, 'Preparing upload…', `${fileArray.length} file${fileArray.length === 1 ? '' : 's'}`);
+
+    // Capture and upload the first displayable frame immediately, in parallel with
+    // the original media upload. There is no seek, scan, or black-frame analysis.
+    const preparedCoverPromise = firstFileIsVideo
+      ? prepareFirstFrameCover(fileArray[0], postType, signal, path => createdPaths.push(path))
+          .then(result => {
+            preparedCoverResult = result;
+            preparedCoverSettled = true;
+            return result;
+          })
+          .catch(error => {
+            preparedCoverSettled = true;
+            if (error?.name !== 'AbortError') console.warn('First-frame cover preparation failed:', error);
+            return null;
+          })
+      : Promise.resolve(null);
 
     try {
       for (let i = 0; i < fileArray.length; i++) {
         throwIfUploadCancelled(signal);
         const file = fileArray[i];
-        // Never block the upload on cover extraction. Both Reel and carousel media
-        // upload immediately; Reel covers are generated after the post is saved.
-        const generateThumbnail = false;
-        const thumbnailMode = 'quick';
         const item = await uploadMediaFile(file, status => {
           if (status.phase === 'upload') {
             const withinFile = Math.max(0, Math.min(1, (status.loaded || 0) / Math.max(1, status.total || file.size || 1)));
-            const percent = 5 + ((i + withinFile * .9) / fileArray.length) * 88;
+            const percent = 5 + ((i + withinFile * .95) / fileArray.length) * 88;
             setUploadProgress(percent, `Uploading media ${i + 1} of ${fileArray.length}…`, file.name);
-          } else if (status.phase === 'thumbnail') {
-            const percent = 5 + ((i + .92) / fileArray.length) * 88;
-            setUploadProgress(percent, isSingleVideoReel ? 'Finding the best Reel cover…' : 'Generating carousel cover from Slide 1…', file.name);
-          } else if (status.phase === 'thumbnailUpload') {
-            const percent = 5 + ((i + .97) / fileArray.length) * 88;
-            setUploadProgress(percent, isSingleVideoReel ? 'Uploading Reel cover…' : 'Uploading carousel cover…', file.name);
           }
         }, {
-          generateThumbnail,
-          thumbnailMode,
+          generateThumbnail: false,
           signal,
           onPath: path => createdPaths.push(path)
         });
@@ -3859,8 +3978,18 @@
       }
 
       throwIfUploadCancelled(signal);
+
+      // The tiny JPEG normally finishes before the much larger video. Give it only
+      // a brief grace period; the post still saves immediately if a device is slow.
+      if (firstFileIsVideo && !preparedCoverSettled) {
+        await Promise.race([
+          preparedCoverPromise,
+          new Promise(resolve => setTimeout(resolve, 500))
+        ]);
+      }
+
       setUploadCancelable(false);
-      setUploadProgress(94, 'Saving post to Supabase…', '');
+      setUploadProgress(95, 'Saving post…', '');
       const images = uploadedItems.filter(item => item.mediaType === 'image');
       const videos = uploadedItems.filter(item => item.mediaType === 'video');
       const id = Date.now();
@@ -3868,16 +3997,23 @@
       if (videos.length === 1 && images.length === 0) {
         posts.unshift({
           id, type: 'reel', username: 'yourbrand', avatar: 'YB',
-          thumbnail: videos[0].thumbnailUrl || videos[0].url,
-          thumbnailStoragePath: videos[0].thumbnailPath || null,
+          thumbnail: preparedCoverResult?.thumbnailUrl || videos[0].url,
+          thumbnailStoragePath: preparedCoverResult?.thumbnailPath || null,
           videoUrl: videos[0].url, storagePath: videos[0].path,
           caption: '', likes: Math.floor(Math.random() * 5000) + 500,
           views: (Math.random() * 50 + 5).toFixed(1) + 'K', isDemo: false
         });
       } else {
-        const allSlides = uploadedItems.map(item => ({
-          url: item.url, type: item.mediaType, storagePath: item.path,
-          thumbnailUrl: item.thumbnailUrl || null, thumbnailPath: item.thumbnailPath || null
+        const allSlides = uploadedItems.map((item, index) => ({
+          url: item.url,
+          type: item.mediaType,
+          storagePath: item.path,
+          thumbnailUrl: index === 0 && item.mediaType === 'video'
+            ? (preparedCoverResult?.thumbnailUrl || null)
+            : (item.thumbnailUrl || null),
+          thumbnailPath: index === 0 && item.mediaType === 'video'
+            ? (preparedCoverResult?.thumbnailPath || null)
+            : (item.thumbnailPath || null)
         }));
         if (allSlides.length) {
           posts.unshift({
@@ -3891,17 +4027,14 @@
       await savePosts();
       renderGallery();
       if (input) input.value = '';
-      const backgroundReelCover = isSingleVideoReel && fileArray[0]?.type.startsWith('video/');
-      const backgroundCarouselCover = !isSingleVideoReel && uploadedItems[0]?.mediaType === 'video';
-      const backgroundCover = backgroundReelCover || backgroundCarouselCover;
-      setUploadProgress(
-        100,
-        backgroundReelCover ? 'Reel uploaded' : (backgroundCarouselCover ? 'Carousel uploaded' : 'Upload complete'),
-        backgroundCover ? 'Cover finishing in the background' : `${fileArray.length} file${fileArray.length === 1 ? '' : 's'} ready`
-      );
+      setUploadProgress(100, 'Upload complete', `${fileArray.length} file${fileArray.length === 1 ? '' : 's'} ready`);
       setTimeout(resetUploadProgress, 850);
-      if (backgroundReelCover) void generateReelCoverInBackground(id, fileArray[0]);
-      if (backgroundCarouselCover) void generateCarouselCoverInBackground(id, fileArray[0], preparedCarouselCoverPromise);
+
+      // On unusually slow devices the cover may finish just after the post appears.
+      // Attach it silently without reopening or blocking the upload panel.
+      if (firstFileIsVideo && !preparedCoverResult) {
+        void applyPreparedCoverToSavedPost(id, postType, preparedCoverPromise);
+      }
     } catch (error) {
       const cancelled = error?.name === 'AbortError' || uploadCancelRequested;
       if (cancelled) console.info('Upload cancelled.');
