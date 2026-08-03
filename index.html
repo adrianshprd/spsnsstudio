@@ -1831,6 +1831,47 @@
     }
   }
 
+
+
+  /* ===== MOBILE VIDEO STARTUP / STUDIO COVER FIX =====
+   * Studio cards use the generated JPEG as the native video poster instead of
+   * asking mobile Safari to paint a paused remote video. In the Client viewer,
+   * the same poster stays visible while the original file buffers, with a small
+   * loading indicator rather than a black/frozen first frame.
+   */
+  .viewer-video-buffer {
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:30px;
+    height:30px;
+    margin:-15px 0 0 -15px;
+    z-index:7;
+    border:3px solid rgba(255,255,255,.32);
+    border-top-color:#fff;
+    border-radius:50%;
+    opacity:0;
+    pointer-events:none;
+    animation:viewerVideoSpin .75s linear infinite;
+    transition:opacity .15s ease;
+    filter:drop-shadow(0 1px 5px rgba(0,0,0,.35));
+  }
+  .viewer-video-is-buffering > .viewer-video-buffer,
+  .viewer-video-is-buffering .viewer-video-buffer { opacity:1; }
+  .viewer-video-has-started > .viewer-video-buffer,
+  .viewer-video-has-started .viewer-video-buffer { opacity:0; }
+  @keyframes viewerVideoSpin { to { transform:rotate(360deg); } }
+
+  /* The native poster is the reliable still-frame path on iOS. */
+  .post-card video[poster],
+  .post-viewer video[poster] { background:#000; }
+  .carousel-viewer-media .carousel-slide video[poster] { background:#fff; }
+
+  /* While a Reel is waiting for its first playable frame, do not darken its
+     poster with the full-screen interaction layer. */
+  .reel-media-wrap.viewer-video-is-buffering .reel-play-overlay { background:transparent; }
+  .reel-media-wrap.viewer-video-is-buffering .reel-play-overlay svg { opacity:0; }
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -4110,8 +4151,9 @@
     const slidesHtml = post.slides.map(slide => {
       const url = typeof slide === 'object' ? slide.url : slide;
       const type = typeof slide === 'object' ? slide.type : 'image';
+      const poster = typeof slide === 'object' ? (slide.thumbnailUrl || '') : '';
       return `<div class="carousel-slide">${type === 'video'
-        ? `<video src="${url}" loop playsinline muted preload="metadata"></video>`
+        ? `<video src="${url}" ${poster ? `poster="${poster}"` : ''} loop playsinline muted preload="none"></video>`
         : `<img src="${url}" alt="carousel slide" loading="lazy">`}</div>`;
     }).join('');
 
@@ -4149,7 +4191,7 @@
         <button class="header-more-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
       </div>
       <div class="media-container" id="media-${post.id}">
-        ${hasVideo ? `<video id="${videoId}" class="video-reel" src="${post.videoUrl}" loop playsinline muted preload="metadata"></video>
+        ${hasVideo ? `<video id="${videoId}" class="video-reel" src="${post.videoUrl}" ${post.thumbnail && post.thumbnail !== post.videoUrl ? `poster="${post.thumbnail}"` : ''} loop playsinline muted preload="none"></video>
           <div class="play-overlay" id="play-${post.id}" onclick="event.stopPropagation();togglePlay(${post.id})"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
           <button class="mute-btn" id="mute-${post.id}" onclick="event.stopPropagation();toggleMute(${post.id})">${soundIconSvg(true)}</button>
           <div class="video-controls" id="controls-${post.id}"><button onclick="event.stopPropagation();togglePlay(${post.id})"><svg viewBox="0 0 24 24" fill="currentColor" id="play-icon-${post.id}"><polygon points="5 3 19 12 5 21 5 3"/></svg></button><div class="progress-bar" onclick="event.stopPropagation();seekVideo(event,${post.id})"><div class="progress-fill" id="progress-${post.id}"></div></div><span class="time-display" id="time-${post.id}">0:00</span></div>`
@@ -4181,7 +4223,7 @@
     const id = post.id;
     return `<div class="reel-viewer">
       <div class="reel-media-wrap viewer-transition-target">
-        ${hasVideo ? `<video id="viewer-reel-video-${id}" class="reel-video" src="${post.videoUrl}" crossorigin="anonymous" loop playsinline ${globalMuted ? 'muted' : ''} preload="metadata" ontimeupdate="viewerReelUpdateProgress(${id})" onended="viewerReelOnEnded(${id})"></video><div class="reel-play-overlay" id="reel-play-overlay-${id}" onclick="viewerReelTogglePlay(${id})"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>` : `<img src="${post.thumbnail}" alt="reel" class="reel-video">`}
+        ${hasVideo ? `<video id="viewer-reel-video-${id}" class="reel-video" ${Number(id) === Number(viewerPostId) ? `src="${post.videoUrl}"` : `data-src="${post.videoUrl}"`} ${post.thumbnail && post.thumbnail !== post.videoUrl ? `poster="${post.thumbnail}"` : ''} crossorigin="anonymous" loop playsinline ${globalMuted ? 'muted' : ''} preload="${Number(id) === Number(viewerPostId) ? 'auto' : 'none'}" onloadstart="viewerVideoBuffering(this,true)" onwaiting="viewerVideoBuffering(this,true)" onplaying="viewerVideoStarted(this)" oncanplay="viewerVideoCanPlay(this)" onerror="viewerVideoFailed(this)" ontimeupdate="viewerReelUpdateProgress(${id})" onended="viewerReelOnEnded(${id})"></video><div class="viewer-video-buffer" aria-hidden="true"></div><div class="reel-play-overlay" id="reel-play-overlay-${id}" onclick="viewerReelTogglePlay(${id})"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>` : `<img src="${post.thumbnail}" alt="reel" class="reel-video">`}
       </div>
       <div class="reel-overlay-gradient"></div>
       <div class="reel-topbar"><div class="reel-title">Reels</div><div class="reel-topbar-right"><span class="reel-camera-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span><button class="reel-close" onclick="closeViewer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>
@@ -4202,10 +4244,12 @@
     const id = post.id;
     const slideIndex = Number.isInteger(post.currentSlide) ? post.currentSlide : 0;
     const dots = post.slides.map((_, i) => `<div class="dot ${i === slideIndex ? 'active' : ''}"></div>`).join('');
-    const slidesHtml = post.slides.map(slide => {
+    const slidesHtml = post.slides.map((slide, index) => {
       const url = typeof slide === 'object' ? slide.url : slide;
       const type = typeof slide === 'object' ? slide.type : 'image';
-      return `<div class="carousel-slide">${type === 'video' ? `<video src="${url}" crossorigin="anonymous" loop playsinline ${globalMuted ? 'muted' : ''} preload="metadata"></video>` : `<img src="${url}" crossorigin="anonymous" alt="carousel">`}</div>`;
+      const poster = typeof slide === 'object' ? (slide.thumbnailUrl || '') : '';
+      const isInitialVideo = Number(id) === Number(viewerPostId) && index === slideIndex;
+      return `<div class="carousel-slide${isInitialVideo && type === 'video' ? ' viewer-video-is-buffering' : ''}">${type === 'video' ? `<video ${isInitialVideo ? `src="${url}"` : `data-src="${url}"`} ${poster ? `poster="${poster}"` : ''} crossorigin="anonymous" loop playsinline ${globalMuted ? 'muted' : ''} preload="${isInitialVideo ? 'auto' : 'none'}" onloadstart="viewerVideoBuffering(this,true)" onwaiting="viewerVideoBuffering(this,true)" onplaying="viewerVideoStarted(this)" oncanplay="viewerVideoCanPlay(this)" onerror="viewerVideoFailed(this)"></video><div class="viewer-video-buffer" aria-hidden="true"></div>` : `<img src="${url}" crossorigin="anonymous" alt="carousel">`}</div>`;
     }).join('');
     return `<div class="carousel-viewer">
       <div class="carousel-viewer-header"><div class="avatar">${post.avatar}</div><div class="post-header-info"><div class="username">${post.username}</div></div><button class="more-btn" onclick="closeViewer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -4710,6 +4754,173 @@
   window.addEventListener('focus', () => { if (appBooted) scheduleCloudRefresh(); });
   window.addEventListener('pageshow', () => { if (appBooted) scheduleCloudRefresh(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && appBooted) scheduleCloudRefresh(); });
+
+
+  /* ===== MOBILE VIDEO STARTUP / STUDIO COVER FIX ===== */
+  function viewerVideoContainer(video) {
+    return video?.closest?.('.carousel-slide, .reel-media-wrap') || null;
+  }
+
+  function viewerVideoBuffering(video, buffering = true) {
+    const container = viewerVideoContainer(video);
+    if (!container || container.classList.contains('viewer-video-has-started') && !buffering) return;
+    container.classList.toggle('viewer-video-is-buffering', Boolean(buffering));
+  }
+
+  function viewerVideoStarted(video) {
+    const container = viewerVideoContainer(video);
+    if (container) {
+      container.classList.add('viewer-video-has-started');
+      container.classList.remove('viewer-video-is-buffering');
+    }
+    const reelItem = video?.closest?.('.reel-viewer');
+    const overlay = reelItem?.querySelector?.('.reel-play-overlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
+  function viewerVideoCanPlay(video) {
+    const container = viewerVideoContainer(video);
+    if (container && video.readyState >= 3) container.classList.remove('viewer-video-is-buffering');
+  }
+
+  function viewerVideoFailed(video) {
+    const container = viewerVideoContainer(video);
+    if (container) container.classList.remove('viewer-video-is-buffering');
+  }
+
+  function ensureViewerVideoReady(video) {
+    if (!video) return;
+    if (!video.getAttribute('src') && video.dataset.src) {
+      video.setAttribute('src', video.dataset.src);
+    }
+    video.preload = 'auto';
+    viewerVideoBuffering(video, true);
+    if (video.readyState === 0) {
+      try { video.load(); } catch (_) {}
+    }
+  }
+
+  function viewerPostWindow(allPosts, activeId, maximum = 5) {
+    if (!Array.isArray(allPosts) || allPosts.length <= maximum) return allPosts || [];
+    const index = Math.max(0, allPosts.findIndex(post => Number(post.id) === Number(activeId)));
+    const half = Math.floor(maximum / 2);
+    let start = Math.max(0, index - half);
+    let end = Math.min(allPosts.length, start + maximum);
+    start = Math.max(0, end - maximum);
+    return allPosts.slice(start, end);
+  }
+
+  /* The full neighbouring-post feed remains available, but only the tapped
+     video receives a real src and preload=auto. Every other video stays poster-
+     only until it becomes active, preventing mobile decoders and the network
+     from competing with the post the user actually opened. */
+  function openViewer(id, sourceElement = null) {
+    if (Date.now() - lastSwipeAt < 700 || viewerClosing) return;
+    const post = posts.find(item => Number(item.id) === Number(id));
+    if (!post) return;
+    const allViewerPosts = getViewerPosts();
+    allViewerPosts.forEach(item => { if (item.type === 'carousel') item.currentSlide = 0; });
+    // Keep the full neighbouring-post feed, but non-active videos have only a
+    // poster and data-src. They do not request the original file until activated.
+    const viewerPosts = allViewerPosts;
+    viewerPostId = Number(id);
+    viewerOpenSource = sourceElement || document.querySelector(`.grid-cell[data-post-id="${id}"]`);
+
+    const viewer = document.getElementById('postViewer');
+    const inner = document.getElementById('viewerInner');
+    inner.className = 'post-viewer-inner viewer-feed';
+    inner.innerHTML = viewerPosts.map((item, index) => renderViewerFeedItem(item, index, viewerPosts.length)).join('') + (viewerPosts.length > 1 ? '<div class="viewer-neighbour-hint">Scroll for neighbouring posts</div>' : '');
+    viewer.classList.add('active', 'preparing');
+    document.body.style.overflow = 'hidden';
+    const targetItem = inner.querySelector(`.viewer-feed-item[data-post-id="${id}"]`);
+    if (targetItem) inner.scrollTop = targetItem.offsetTop;
+
+    // Keep play() inside the original tap and prioritise only this media file.
+    activateViewerPost(id);
+
+    requestAnimationFrame(() => {
+      viewer.classList.remove('preparing');
+      animateViewerOpen(viewerOpenSource, id);
+    });
+
+    if (viewerScrollHandler) inner.removeEventListener('scroll', viewerScrollHandler);
+    viewerScrollHandler = handleViewerFeedScroll;
+    inner.addEventListener('scroll', viewerScrollHandler, { passive:true });
+  }
+
+  function syncViewerCarouselMedia(postId = viewerPostId) {
+    const post = posts.find(p => Number(p.id) === Number(postId));
+    const track = document.getElementById(`viewer-track-${postId}`);
+    if (!post || !track) return;
+    const isActive = Number(viewerPostId) === Number(postId);
+    track.querySelectorAll('.carousel-slide').forEach((slideEl, index) => {
+      const video = slideEl.querySelector('video');
+      if (!video) return;
+      video.muted = globalMuted;
+      if (isActive && index === post.currentSlide) {
+        ensureViewerVideoReady(video);
+        video.play().catch(() => {
+          viewerVideoBuffering(video, false);
+          const icon = document.querySelector(`#carousel-video-play-${postId} svg`);
+          if (icon) icon.style.display = 'block';
+        });
+      } else {
+        video.pause();
+        if (index !== post.currentSlide) {
+          try { video.currentTime = 0; } catch (_) {}
+        }
+      }
+    });
+    const overlay = document.getElementById(`carousel-video-play-${postId}`);
+    const muteBtn = document.getElementById(`carousel-video-mute-${postId}`);
+    const currentVideo = currentViewerCarouselVideo(postId);
+    if (overlay) {
+      overlay.style.display = currentVideo ? 'flex' : 'none';
+      const icon = overlay.querySelector('svg');
+      if (icon) icon.style.display = currentVideo?.paused ? 'block' : 'none';
+    }
+    if (muteBtn) {
+      muteBtn.style.display = currentVideo ? 'flex' : 'none';
+      muteBtn.innerHTML = soundIconSvg(globalMuted);
+    }
+  }
+
+  function initReelViewerVideo(post) {
+    const video = document.getElementById(`viewer-reel-video-${post.id}`);
+    if (!video) return;
+    viewerVideoRef = video;
+    video.muted = globalMuted;
+    ensureViewerVideoReady(video);
+    video.play().then(() => {
+      const overlay = document.getElementById(`reel-play-overlay-${post.id}`);
+      if (overlay) overlay.style.display = 'none';
+    }).catch(() => {
+      viewerVideoBuffering(video, false);
+      const overlay = document.getElementById(`reel-play-overlay-${post.id}`);
+      if (overlay) overlay.style.display = 'flex';
+    });
+  }
+
+  function activateViewerPost(postId) {
+    const numericId = Number(postId);
+    if (!Number.isFinite(numericId)) return;
+    viewerPostId = numericId;
+    document.querySelectorAll('.viewer-feed-item').forEach(item => {
+      const active = Number(item.dataset.postId) === numericId;
+      item.classList.toggle('active-viewer-item', active);
+      item.querySelectorAll('video').forEach(video => {
+        if (!active) {
+          video.pause();
+          viewerVideoBuffering(video, false);
+        }
+      });
+    });
+    const post = posts.find(item => Number(item.id) === numericId);
+    if (!post) return;
+    if (post.type === 'reel') initReelViewerVideo(post);
+    else syncViewerCarouselMedia(post.id);
+    updateViewerMuteButtons();
+  }
 
 
   async function initializeApp() {
