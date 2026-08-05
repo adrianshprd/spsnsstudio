@@ -6052,6 +6052,138 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
   }
 
   initializeApp();
+
+
+  /* ===== R2 WORKER MULTIPART TRANSPORT V5 =====
+   * Uploads are split into small parts and sent through the Cloudflare Worker.
+   * This avoids direct browser-to-R2 CORS failures and supports large videos.
+   */
+  async function getR2AccessToken() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session?.access_token) throw new Error('Please sign in before accessing media.');
+    return session.access_token;
+  }
+
+  async function r2WorkerJson(path, options = {}) {
+    const token = await getR2AccessToken();
+    let response;
+    try {
+      response = await fetch(`${R2_SIGNER_URL}${path}`, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          ...(options.body && !(options.body instanceof Blob) ? { 'Content-Type': 'application/json' } : {}),
+          ...(options.headers || {})
+        },
+        credentials: 'omit'
+      });
+    } catch (error) {
+      throw new Error(`Cloudflare Worker connection failed: ${error?.message || 'network error'}`);
+    }
+
+    let payload = null;
+    try { payload = await response.json(); } catch (_) {}
+    if (!response.ok) {
+      throw new Error(payload?.error || `Cloudflare Worker request failed (${response.status}).`);
+    }
+    return payload || {};
+  }
+
+  async function signR2Request(action, key, contentType = 'application/octet-stream') {
+    if (!key) throw new Error('Missing R2 object key.');
+    return r2WorkerJson('/sign', {
+      method: 'POST',
+      body: JSON.stringify({ action, key, contentType })
+    });
+  }
+
+  function uploadR2Part(path, blob, token, signal, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      let settled = false;
+
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        activeUploadXhrs.delete(xhr);
+        signal?.removeEventListener('abort', abortUpload);
+        callback(value);
+      };
+      const abortUpload = () => {
+        try { xhr.abort(); } catch (_) {}
+        finish(reject, createUploadAbortError());
+      };
+
+      xhr.open('PUT', `${R2_SIGNER_URL}${path}`, true);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      activeUploadXhrs.add(xhr);
+      signal?.addEventListener('abort', abortUpload, { once: true });
+      xhr.upload.onprogress = event => {
+        if (event.lengthComputable) onProgress?.(event.loaded, event.total);
+      };
+      xhr.onerror = () => finish(reject, new Error('Could not upload a part to the Cloudflare Worker.'));
+      xhr.onabort = () => finish(reject, createUploadAbortError());
+      xhr.onload = () => {
+        let payload = null;
+        try { payload = JSON.parse(xhr.responseText || '{}'); } catch (_) {}
+        if (xhr.status >= 200 && xhr.status < 300 && payload?.etag) return finish(resolve, payload);
+        finish(reject, new Error(payload?.error || `Cloudflare part upload failed (${xhr.status}).`));
+      };
+      try { xhr.send(blob); }
+      catch (error) { finish(reject, error); }
+    });
+  }
+
+  async function uploadBinaryToR2(key, file, onProgress, signal = currentUploadController?.signal) {
+    throwIfUploadCancelled(signal);
+    const token = await getR2AccessToken();
+    const init = await r2WorkerJson('/upload/init', {
+      method: 'POST',
+      body: JSON.stringify({
+        key,
+        contentType: file.type || 'application/octet-stream',
+        size: file.size
+      })
+    });
+
+    const uploadId = String(init.uploadId || '');
+    const partSize = Math.max(5 * 1024 * 1024, Number(init.partSize || 8 * 1024 * 1024));
+    if (!uploadId) throw new Error('Cloudflare did not create a multipart upload.');
+
+    const parts = [];
+    let uploadedBytes = 0;
+    try {
+      const totalParts = Math.max(1, Math.ceil(file.size / partSize));
+      for (let index = 0; index < totalParts; index += 1) {
+        throwIfUploadCancelled(signal);
+        const start = index * partSize;
+        const end = Math.min(file.size, start + partSize);
+        const blob = file.slice(start, end);
+        const path = `/upload/part?key=${encodeURIComponent(key)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${index + 1}`;
+        const result = await uploadR2Part(path, blob, token, signal, loaded => {
+          onProgress?.(Math.min(file.size, uploadedBytes + loaded), file.size);
+        });
+        uploadedBytes = end;
+        onProgress?.(uploadedBytes, file.size);
+        parts.push({ partNumber: Number(result.partNumber), etag: String(result.etag) });
+      }
+
+      await r2WorkerJson('/upload/complete', {
+        method: 'POST',
+        body: JSON.stringify({ key, uploadId, parts })
+      });
+      return key;
+    } catch (error) {
+      try {
+        await r2WorkerJson('/upload/abort', {
+          method: 'POST',
+          body: JSON.stringify({ key, uploadId })
+        });
+      } catch (_) {}
+      throw error;
+    }
+  }
 </script>
 </body>
 </html>
