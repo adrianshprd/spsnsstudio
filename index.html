@@ -5435,16 +5435,20 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session?.access_token) throw new Error('Please sign in before accessing media.');
 
-    const response = await fetch(`${R2_SIGNER_URL}/sign`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify({ action, key, contentType }),
-      cache: 'no-store',
-      credentials: 'omit'
-    });
+    let response;
+    try {
+      response = await fetch(`${R2_SIGNER_URL}/sign`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ action, key, contentType }),
+        credentials: 'omit'
+      });
+    } catch (error) {
+      throw new Error(`Could not reach the Cloudflare signer: ${error?.message || 'network/CORS error'}`);
+    }
 
     let payload = null;
     try { payload = await response.json(); } catch (_) {}
@@ -5673,7 +5677,6 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     const response = await fetch(String(signed.url), {
       method: 'DELETE',
       headers: signed.headers || {},
-      cache: 'no-store',
       credentials: 'omit'
     });
     if (!response.ok && response.status !== 404) {
