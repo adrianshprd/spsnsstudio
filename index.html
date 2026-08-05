@@ -941,7 +941,7 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0;
+    padding: calc(46px + env(safe-area-inset-top, 0px)) 18px 0;
     pointer-events: none;
   }
   .reel-immersive-topbar .reel-circle-back,
@@ -1000,20 +1000,20 @@
   }
   .reel-left-info {
     position: absolute;
-    bottom: calc(86px + env(safe-area-inset-bottom, 0px));
-    left: 16px;
-    right: 92px;
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    left: 14px;
+    right: 96px;
     z-index: 10;
     color: white;
   }
   .reel-user-row {
     display: flex;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
   .reel-user-row .avatar {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
     margin-right: 10px;
     font-size: 12px;
   }
@@ -1033,9 +1033,9 @@
     color: #fff;
   }
   .reel-caption-text {
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.35;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -1045,7 +1045,7 @@
   .reel-audio-row {
     display: flex;
     align-items: center;
-    font-size: 14px;
+    font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
   }
@@ -1057,13 +1057,13 @@
   }
   .reel-right-actions {
     position: absolute;
-    right: 12px;
-    bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+    right: 10px;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
     z-index: 10;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 18px;
+    gap: 14px;
   }
   .reel-action-item {
     display: flex;
@@ -1078,13 +1078,14 @@
     margin-bottom: 2px;
   }
   .reel-action-label {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     text-align: center;
+    margin-top: 2px;
   }
   .reel-disc-spin {
-    width: 36px;
-    height: 36px;
+    width: 42px;
+    height: 42px;
     border-radius: 8px;
     background: linear-gradient(135deg, var(--accent), var(--accent2));
     display: flex;
@@ -1103,7 +1104,7 @@
     position: absolute;
     left: 0;
     right: 0;
-    bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
     height: 2px;
     background: rgba(255,255,255,0.2);
     z-index: 20;
@@ -1120,7 +1121,7 @@
     left: 12px;
     right: 12px;
     bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-    height: 50px;
+    height: 48px;
     z-index: 16;
     border-radius: 27px;
     background: rgba(20,20,22,0.92);
@@ -2429,6 +2430,7 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
   let viewerPostId = null;
   let viewerVideoRef = null;
   let viewerCarouselVideos = {};
+  let viewerOpenedAt = 0;
 
   /* ============================================================
    * STORAGE — all persistence lives in this section.
@@ -3176,6 +3178,7 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     const post = posts.find(p => p.id === id);
     if (!post) return;
     viewerPostId = id;
+    viewerOpenedAt = Date.now();
 
     const viewerInner = document.getElementById('viewerInner');
     viewerInner.innerHTML = '';
@@ -3260,7 +3263,7 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
 
         <div class="reel-immersive-shell">
           <div class="reel-immersive-topbar">
-            <button class="reel-plain-topbtn" onclick="viewerReelToggleMode()" aria-label="Back to post view">
+            <button class="reel-plain-topbtn" onclick="closeViewer()" aria-label="Back to post view">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M15 18l-6-6 6-6"/>
               </svg>
@@ -3315,7 +3318,10 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
               <div class="reel-action-item" onclick="event.stopPropagation();">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="reel-action-icon"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
               </div>
-              <div class="reel-action-item" style="margin-top:4px;" onclick="event.stopPropagation();">
+              <div class="reel-action-item" onclick="event.stopPropagation();">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="reel-action-icon" style="width:24px;height:24px;"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+              </div>
+              <div class="reel-action-item" style="margin-top:2px;" onclick="event.stopPropagation();">
                 <div class="reel-disc-spin">${post.avatar}</div>
               </div>
             </div>
@@ -3538,6 +3544,7 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
   function viewerReelToggleMode(forceMode) {
     const shell = document.getElementById('reelViewerShell');
     if (!shell) return;
+    if (!forceMode && Date.now() - viewerOpenedAt < 450) return;
     const nextMode = forceMode || (shell.dataset.immersive === '1' ? '0' : '1');
     const detailVideo = document.getElementById('viewer-reel-video');
     const immersiveVideo = document.getElementById('viewer-reel-video-immersive');
@@ -3566,6 +3573,8 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
   }
 
   function initReelViewerVideo(post) {
+    const shell = document.getElementById('reelViewerShell');
+    if (shell) shell.dataset.immersive = '0';
     const detailVideo = document.getElementById('viewer-reel-video');
     const immersiveVideo = document.getElementById('viewer-reel-video-immersive');
     [detailVideo, immersiveVideo].forEach(video => {
