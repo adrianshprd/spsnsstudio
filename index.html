@@ -2321,6 +2321,125 @@
   .studio-lazy-video { background:#111; }
   .studio-carousel-play { background:rgba(0,0,0,.18); }
   .static-reel-cover { background:linear-gradient(145deg,#202020,#111); }
+
+  /* ===== FINAL INSTAGRAM TWO-STAGE REEL VIEWER ===== */
+  .ig-reel-viewer {
+    width:100% !important;
+    max-width:430px;
+    height:100dvh !important;
+    min-height:100dvh !important;
+    margin:0 auto;
+    position:relative;
+    overflow:hidden;
+    background:#05090d;
+    color:#fff;
+    display:block !important;
+  }
+  .ig-reel-detail-scroll {
+    width:100%; height:100%; overflow-y:auto; overflow-x:hidden;
+    background:#05090d; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  .ig-reel-detail-scroll::-webkit-scrollbar { display:none; }
+  .ig-reel-detail-header {
+    height:112px; padding:calc(12px + env(safe-area-inset-top,0px)) 18px 14px;
+    display:grid; grid-template-columns:58px 1fr 58px; align-items:end;
+    background:#05090d; position:relative; z-index:20;
+  }
+  .ig-reel-detail-back {
+    width:52px; height:52px; padding:0; border-radius:50%; border:1px solid rgba(255,255,255,.16);
+    background:rgba(255,255,255,.07); color:#fff; display:flex; align-items:center; justify-content:center;
+  }
+  .ig-reel-detail-back svg { width:28px; height:28px; }
+  .ig-reel-detail-heading { text-align:center; line-height:1.08; padding-bottom:4px; }
+  .ig-reel-detail-heading strong { display:block; font-size:18px; font-weight:700; }
+  .ig-reel-detail-heading span { display:block; font-size:12px; margin-top:5px; color:rgba(255,255,255,.9); }
+  .ig-reel-header-spacer { width:52px; height:52px; }
+
+  .ig-reel-stage {
+    width:100%; aspect-ratio:9/16; position:relative; overflow:hidden; background:#000;
+    touch-action:manipulation;
+  }
+  .ig-reel-video {
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover !important; object-position:center center;
+    background:#000; display:block;
+  }
+  .ig-reel-detail-mediahead {
+    position:absolute; top:0; left:0; right:0; z-index:8; height:62px; padding:11px 12px;
+    display:flex; align-items:center; gap:10px; color:#fff;
+    background:linear-gradient(to bottom,rgba(0,0,0,.36),rgba(0,0,0,0));
+    pointer-events:none;
+  }
+  .ig-reel-avatar { width:38px !important; height:38px !important; font-size:12px !important; background:#eceff2 !important; color:#7e8791 !important; }
+  .ig-reel-mediahead-copy { flex:1; min-width:0; line-height:1.15; }
+  .ig-reel-mediahead-copy strong { display:block; font-size:14px; font-weight:700; }
+  .ig-reel-mediahead-copy span { display:block; margin-top:4px; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:rgba(255,255,255,.9); }
+  .ig-reel-mediahead-menu { width:26px; height:26px; }
+  .ig-reel-detail-mute {
+    position:absolute; right:11px; bottom:11px; z-index:9; width:40px; height:40px; border:0; border-radius:50%;
+    background:rgba(0,0,0,.48); color:#fff; display:flex; align-items:center; justify-content:center;
+  }
+  .ig-reel-detail-mute svg { width:17px; height:17px; }
+  .ig-reel-detail-footer { padding:13px 12px 28px; background:#05090d; }
+  .ig-reel-detail-actions { display:flex; align-items:center; justify-content:space-between; }
+  .ig-reel-detail-actions > div { display:flex; gap:18px; align-items:center; }
+  .ig-reel-detail-actions button { border:0; background:none; color:#fff; padding:0; display:flex; }
+  .ig-reel-detail-actions svg { width:30px; height:30px; }
+  .ig-reel-detail-caption { margin-top:13px; font-size:14px; line-height:1.42; color:#fff; }
+  .ig-reel-detail-caption strong { font-weight:700; margin-right:5px; }
+  .ig-reel-detail-time { margin-top:12px; font-size:11px; color:rgba(255,255,255,.48); text-transform:uppercase; }
+
+  .ig-reel-immersive-top,.ig-reel-immersive-gradient,.ig-reel-immersive-copy,.ig-reel-actions,.ig-reel-progress,.ig-reel-composer { display:none; }
+
+  .ig-reel-viewer[data-mode="immersive"] { display:grid !important; grid-template-rows:minmax(0,1fr) 82px; background:#05090d; }
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-detail-scroll { display:contents; }
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-detail-header,
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-detail-footer,
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-detail-mediahead,
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-detail-mute { display:none; }
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-stage {
+    grid-row:1; width:100%; height:100%; aspect-ratio:auto; position:relative; overflow:hidden; background:#000;
+  }
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-video { object-fit:cover !important; }
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-immersive-top {
+    display:flex; position:absolute; top:0; left:0; right:0; z-index:14; align-items:center; justify-content:space-between;
+    padding:calc(16px + env(safe-area-inset-top,0px)) 16px 0;
+  }
+  .ig-reel-immersive-top button { width:42px; height:42px; padding:5px; border:0; background:none; color:#fff; display:flex; align-items:center; justify-content:center; }
+  .ig-reel-immersive-top svg { width:31px; height:31px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-immersive-gradient {
+    display:block; position:absolute; z-index:6; left:0; right:0; bottom:0; height:38%;
+    background:linear-gradient(to top,rgba(0,0,0,.58),rgba(0,0,0,0)); pointer-events:none;
+  }
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-immersive-copy {
+    display:block; position:absolute; z-index:10; left:14px; right:86px; bottom:42px; color:#fff;
+  }
+  .ig-reel-owner { display:flex; align-items:center; gap:9px; margin-bottom:10px; }
+  .ig-reel-owner .avatar { width:34px; height:34px; font-size:11px; }
+  .ig-reel-owner strong { font-size:14px; }
+  .ig-reel-caption { font-size:13px; line-height:1.35; max-height:2.7em; overflow:hidden; margin-bottom:8px; }
+  .ig-reel-audio { display:flex; gap:7px; align-items:center; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-actions {
+    display:flex; position:absolute; z-index:11; right:9px; bottom:34px; flex-direction:column; align-items:center; gap:13px;
+  }
+  .ig-reel-actions button { width:50px; padding:0; border:0; background:none; color:#fff; display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .ig-reel-actions svg { width:31px; height:31px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
+  .ig-reel-actions span { font-size:12px; font-weight:600; }
+  .ig-reel-actions .ig-reel-more svg { width:25px; height:25px; }
+  .ig-reel-disc { width:42px; height:42px; border-radius:9px; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; transform:rotate(12deg); }
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-progress { display:block; position:absolute; left:0; right:0; bottom:0; z-index:13; height:2px; background:rgba(255,255,255,.25); }
+  .ig-reel-progress > div { height:100%; width:0%; background:#fff; }
+  .ig-reel-viewer[data-mode="immersive"] .ig-reel-composer {
+    display:flex; grid-row:2; align-items:center; padding:8px 14px max(8px,env(safe-area-inset-bottom,0px)); background:#05090d; z-index:20;
+  }
+  .ig-reel-composer > div { width:100%; height:52px; border-radius:28px; background:#171b20; display:flex; align-items:center; padding:0 19px; font-size:16px; color:rgba(255,255,255,.88); }
+
+  @media (min-width:736px) {
+    .ig-reel-viewer { max-width:430px; border-radius:10px; }
+  }
+  @media (max-width:735px) {
+    .ig-reel-viewer { max-width:none; }
+  }
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -5023,23 +5142,80 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
 
   function renderReelViewer(post) {
     const hasVideo = Boolean(post.videoUrl);
-    const id = post.id;
-    return `<div class="reel-viewer">
-      <div class="reel-media-wrap viewer-transition-target">
-        ${hasVideo ? `<video id="viewer-reel-video-${id}" class="reel-video" ${Number(id) === Number(viewerPostId) ? `src="${post.videoUrl}"` : `data-src="${post.videoUrl}"`} ${post.thumbnail && post.thumbnail !== post.videoUrl ? `poster="${post.thumbnail}"` : ''} crossorigin="anonymous" loop playsinline ${globalMuted ? 'muted' : ''} preload="${Number(id) === Number(viewerPostId) ? 'auto' : 'none'}" onloadstart="viewerVideoBuffering(this,true)" onwaiting="viewerVideoBuffering(this,true)" onplaying="viewerVideoStarted(this)" oncanplay="viewerVideoCanPlay(this)" onerror="viewerVideoFailed(this)" ontimeupdate="viewerReelUpdateProgress(${id})" onended="viewerReelOnEnded(${id})"></video><div class="viewer-video-buffer" aria-hidden="true"></div><div class="reel-play-overlay" id="reel-play-overlay-${id}" onclick="viewerReelTogglePlay(${id})"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>` : `<img src="${post.thumbnail}" alt="reel" class="reel-video">`}
+    const id = Number(post.id);
+    const isActive = id === Number(viewerPostId);
+    const mediaAttrs = isActive
+      ? `src="${post.videoUrl}" preload="auto"`
+      : `data-src="${post.videoUrl}" preload="none"`;
+    const poster = post.thumbnail && post.thumbnail !== post.videoUrl
+      ? `poster="${post.thumbnail}"`
+      : '';
+    const comments = Math.floor(Math.random() * 500 + 50).toLocaleString();
+    const shares = Math.floor(Math.random() * 900 + 100).toLocaleString();
+    const caption = formatCaption(post.caption || '');
+
+    return `<div class="reel-viewer ig-reel-viewer" id="ig-reel-${id}" data-mode="detail" data-post-id="${id}">
+      <div class="ig-reel-detail-scroll">
+        <header class="ig-reel-detail-header">
+          <button class="ig-reel-detail-back" type="button" onclick="event.stopPropagation();igReelBack(${id})" aria-label="Back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="ig-reel-detail-heading"><strong>Posts</strong><span>${post.username}</span></div>
+          <span class="ig-reel-header-spacer"></span>
+        </header>
+
+        <div class="ig-reel-stage viewer-transition-target" onclick="igReelStageTap(event,${id})">
+          ${hasVideo
+            ? `<video id="viewer-reel-video-${id}" class="ig-reel-video" ${mediaAttrs} ${poster} crossorigin="anonymous" loop playsinline ${globalMuted ? 'muted' : ''} onloadstart="viewerVideoBuffering(this,true)" onwaiting="viewerVideoBuffering(this,true)" onplaying="viewerVideoStarted(this)" oncanplay="viewerVideoCanPlay(this)" onerror="viewerVideoFailed(this)" ontimeupdate="viewerReelUpdateProgress(${id})" onended="viewerReelOnEnded(${id})"></video><div class="viewer-video-buffer" aria-hidden="true"></div>`
+            : `<img src="${post.thumbnail}" class="ig-reel-video" alt="Reel">`}
+
+          <div class="ig-reel-detail-mediahead">
+            <div class="avatar ig-reel-avatar">${post.avatar}</div>
+            <div class="ig-reel-mediahead-copy"><strong>${post.username}</strong><span>♫ ${post.username} · Original audio</span></div>
+            <svg class="ig-reel-mediahead-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="7" x2="20" y2="7"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="14" y1="17" x2="20" y2="17"/></svg>
+          </div>
+
+          ${hasVideo ? `<button id="reel-viewer-mute-${id}" class="ig-reel-detail-mute" type="button" onclick="event.stopPropagation();viewerReelToggleMute(${id})" aria-label="Toggle sound">${soundIconSvg(globalMuted)}</button>` : ''}
+
+          <div class="ig-reel-immersive-top">
+            <button type="button" onclick="event.stopPropagation();igReelBack(${id})" aria-label="Back">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <button type="button" onclick="event.stopPropagation()" aria-label="Camera">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </button>
+          </div>
+
+          <div class="ig-reel-immersive-gradient"></div>
+          <div class="ig-reel-immersive-copy">
+            <div class="ig-reel-owner"><div class="avatar">${post.avatar}</div><strong>${post.username}</strong></div>
+            <div class="ig-reel-caption">${caption}</div>
+            <div class="ig-reel-audio"><span>♫</span><span>${post.username} · Original audio</span></div>
+          </div>
+
+          <div class="ig-reel-actions" onclick="event.stopPropagation()">
+            <button type="button" onclick="viewerReelToggleLike(this)" aria-label="Like"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span>${post.likes.toLocaleString()}</span></button>
+            <button type="button" aria-label="Comments"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg><span>${comments}</span></button>
+            <button type="button" aria-label="Share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg><span>${shares}</span></button>
+            <button type="button" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+            <button type="button" class="ig-reel-more" aria-label="More"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <div class="ig-reel-disc">${post.avatar}</div>
+          </div>
+
+          ${hasVideo ? `<div class="ig-reel-progress" onclick="event.stopPropagation();viewerReelSeek(event,${id})"><div id="reel-progress-${id}"></div></div>` : ''}
+        </div>
+
+        <footer class="ig-reel-detail-footer">
+          <div class="ig-reel-detail-actions" onclick="event.stopPropagation()">
+            <div><button type="button" onclick="viewerReelToggleLike(this)" aria-label="Like"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button><button type="button" aria-label="Comment"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></button><button type="button" aria-label="Share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button></div>
+            <button type="button" aria-label="Save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          </div>
+          <div class="ig-reel-detail-caption"><strong>${post.username}</strong> ${caption}</div>
+          <div class="ig-reel-detail-time">1 HOUR AGO</div>
+        </footer>
       </div>
-      <div class="reel-overlay-gradient"></div>
-      <div class="reel-topbar"><div class="reel-title">Reels</div><div class="reel-topbar-right"><span class="reel-camera-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span><button class="reel-close" onclick="closeViewer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>
-      ${hasVideo ? `<button class="reel-viewer-mute" id="viewer-reel-mute-${id}" onclick="viewerReelToggleMute(${id})">${soundIconSvg(globalMuted)}</button>` : ''}
-      <div class="reel-left-info"><div class="reel-user-row"><div class="avatar">${post.avatar}</div><span class="reel-username">${post.username}</span><button class="reel-follow-btn">Follow</button></div><div class="reel-caption-text">${formatCaption(post.caption || '')}</div><div class="reel-audio-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span class="reel-audio-text">${post.username} · Original audio</span></div></div>
-      <div class="reel-right-actions">
-        <div class="reel-action-item" onclick="viewerReelToggleLike(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="reel-action-icon"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="reel-action-label">${post.likes.toLocaleString()}</span></div>
-        <div class="reel-action-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="reel-action-icon"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg><span class="reel-action-label">${Math.floor(Math.random() * 500 + 50)}</span></div>
-        <div class="reel-action-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="reel-action-icon"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg><span class="reel-action-label">${Math.floor(Math.random() * 900 + 100)}</span></div>
-        <div class="reel-action-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="reel-action-icon"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div>
-        <div class="reel-action-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="reel-action-icon"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></div><div class="reel-action-item" style="margin-top:4px"><div class="reel-disc-spin">${post.avatar}</div></div>
-      </div>
-      ${hasVideo ? `<div class="reel-progress-track" onclick="viewerReelSeek(event,${id})"><div class="reel-progress-fill" id="reel-progress-${id}"></div></div>` : ''}
+
+      <div class="ig-reel-composer"><div>Add comment...</div></div>
     </div>`;
   }
 
@@ -6485,6 +6661,81 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
       throw error;
     }
   }
+
+  // Final Instagram two-stage Reel interaction overrides.
+  function igReelRoot(postId) {
+    return document.getElementById(`ig-reel-${postId}`);
+  }
+
+  function igReelBack(postId) {
+    const root = igReelRoot(postId);
+    if (root?.dataset.mode === 'immersive') {
+      root.dataset.mode = 'detail';
+      root.querySelector('.ig-reel-detail-scroll')?.scrollTo?.({ top:0, behavior:'instant' });
+      return;
+    }
+    closeViewer();
+  }
+
+  function igReelStageTap(event, postId) {
+    const root = igReelRoot(postId);
+    if (!root || event.target.closest('button,.ig-reel-actions,.ig-reel-progress')) return;
+    if (root.dataset.mode !== 'immersive') {
+      root.dataset.mode = 'immersive';
+      const video = document.getElementById(`viewer-reel-video-${postId}`);
+      if (video) video.play().catch(() => {});
+      return;
+    }
+    viewerReelTogglePlay(postId);
+  }
+
+  function initReelViewerVideo(post) {
+    const root = igReelRoot(post.id);
+    if (root) root.dataset.mode = 'detail';
+    const video = document.getElementById(`viewer-reel-video-${post.id}`);
+    if (!video) return;
+    viewerVideoRef = video;
+    video.muted = globalMuted;
+    ensureViewerVideoReady(video);
+    video.play().then(() => {
+      viewerVideoBuffering(video,false);
+    }).catch(() => {
+      viewerVideoBuffering(video,false);
+    });
+  }
+
+  function viewerReelTogglePlay(postId = viewerPostId) {
+    const video = document.getElementById(`viewer-reel-video-${postId}`);
+    if (!video) return;
+    if (video.paused) video.play().catch(() => {}); else video.pause();
+  }
+
+  function viewerReelToggleMute(postId = viewerPostId) {
+    setGlobalMuted(!globalMuted);
+    const button = document.getElementById(`reel-viewer-mute-${postId}`);
+    if (button) button.innerHTML = soundIconSvg(globalMuted);
+  }
+
+  function viewerReelUpdateProgress(postId = viewerPostId) {
+    const video = document.getElementById(`viewer-reel-video-${postId}`);
+    const fill = document.getElementById(`reel-progress-${postId}`);
+    if (video && fill && Number.isFinite(video.duration) && video.duration > 0) {
+      fill.style.width = `${(video.currentTime / video.duration) * 100}%`;
+    }
+  }
+
+  function viewerReelOnEnded(postId = viewerPostId) {
+    const video = document.getElementById(`viewer-reel-video-${postId}`);
+    if (video) { video.currentTime = 0; video.play().catch(() => {}); }
+  }
+
+  function viewerReelSeek(event, postId = viewerPostId) {
+    const video = document.getElementById(`viewer-reel-video-${postId}`);
+    if (!video || !Number.isFinite(video.duration)) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    video.currentTime = Math.max(0, Math.min(video.duration, ((event.clientX - rect.left) / rect.width) * video.duration));
+  }
+
 </script>
 </body>
 </html>
