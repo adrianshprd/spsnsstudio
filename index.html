@@ -5432,7 +5432,7 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
       const type = typeof slide === 'object' ? slide.type : 'image';
       const poster = typeof slide === 'object' ? (slide.thumbnailUrl || '') : '';
       const isInitialVideo = Number(id) === Number(viewerPostId) && index === slideIndex;
-      return `<div class="carousel-slide${isInitialVideo && type === 'video' ? ' viewer-video-is-buffering' : ''}">${type === 'video' ? `<video data-src="${url}" ${isInitialVideo ? `src="${url}"` : ''} ${poster ? `poster="${poster}"` : ''} loop playsinline webkit-playsinline muted autoplay preload="${isInitialVideo ? 'auto' : 'metadata'}" onloadedmetadata="syncCarouselViewerAspect(${id}, this)" onloadstart="viewerVideoBuffering(this,true)" onwaiting="viewerVideoBuffering(this,true)" onplaying="viewerVideoStarted(this)" oncanplay="viewerVideoCanPlay(this)" onerror="viewerVideoFailed(this)"></video><div class="viewer-video-buffer" aria-hidden="true"></div>` : `<img src="${url}" crossorigin="anonymous" alt="carousel" onload="syncCarouselViewerAspect(${id}, this)">`}</div>`;
+      return `<div class="carousel-slide${isInitialVideo && type === 'video' ? ' viewer-video-is-buffering' : ''}">${type === 'video' ? `<video data-src="${url}" ${isInitialVideo ? `src="${url}"` : ''} ${poster ? `poster="${poster}"` : ''} loop playsinline webkit-playsinline muted autoplay preload="${isInitialVideo ? 'auto' : 'none'}" onloadedmetadata="syncCarouselViewerAspect(${id}, this)" onloadstart="viewerVideoBuffering(this,true)" onwaiting="viewerVideoBuffering(this,true)" onplaying="viewerVideoStarted(this)" oncanplay="viewerVideoCanPlay(this)" onerror="viewerVideoFailed(this)"></video><div class="viewer-video-buffer" aria-hidden="true"></div>` : `<img src="${url}" crossorigin="anonymous" alt="carousel" onload="syncCarouselViewerAspect(${id}, this)">`}</div>`;
     }).join('');
     return `<div class="carousel-viewer">
       <div class="carousel-viewer-header"><div class="avatar">${post.avatar}</div><div class="post-header-info"><div class="username">${post.username}</div></div><button class="more-btn" onclick="closeViewer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -7195,23 +7195,35 @@ function bindPrecisionCarouselSwipe(postId = viewerPostId) {
     return document.getElementById(`viewer-track-${postId}`);
   }
 
-  function restoreCarouselSource(video) {
+  function restoreCarouselSource(video, preloadMode = 'auto') {
     if (!video) return false;
     const source = video.dataset.src || video.getAttribute('src') || '';
     if (!source) return false;
-    if (!video.getAttribute('src')) {
-      video.setAttribute('src', source);
-      try { video.load(); } catch (_) {}
-    }
-    video.preload = 'auto';
+    video.preload = preloadMode;
     video.playsInline = true;
     video.setAttribute('playsinline', '');
     video.setAttribute('webkit-playsinline', '');
+    if (!video.getAttribute('src')) {
+      video.setAttribute('src', source);
+      video.dataset.carouselSourceAttached = '1';
+      try { video.load(); } catch (_) {}
+    }
     return true;
   }
 
+  function prewarmCarouselVideo(video) {
+    if (!video || !restoreCarouselSource(video, 'auto')) return;
+    video.dataset.carouselPrewarmed = '1';
+    video.muted = true;
+    video.defaultMuted = true;
+    // Trigger buffering without starting playback. Safari may ignore load() once
+    // enough data is already cached, which is exactly what we want here.
+    try { video.load(); } catch (_) {}
+  }
+
   async function playCarouselVideoReliably(video, postId) {
-    if (!video || !restoreCarouselSource(video)) return false;
+    if (!video || !restoreCarouselSource(video, 'auto')) return false;
+    video.dataset.carouselWasActive = '1';
     const overlay = document.getElementById(`carousel-video-play-${postId}`);
     const muteBtn = document.getElementById(`carousel-video-mute-${postId}`);
 
@@ -7269,27 +7281,53 @@ function bindPrecisionCarouselSwipe(postId = viewerPostId) {
     const track = carouselTrack(postId);
     if (!post || !track) return;
     const activePost = Number(viewerPostId) === Number(postId);
+    const activeIndex = Number(post.currentSlide || 0);
     const overlay = document.getElementById(`carousel-video-play-${postId}`);
     const muteBtn = document.getElementById(`carousel-video-mute-${postId}`);
+    const slideEls = Array.from(track.querySelectorAll('.carousel-slide'));
 
     if (overlay) overlay.style.display = 'none';
 
-    track.querySelectorAll('.carousel-slide').forEach((slideEl, index) => {
+    slideEls.forEach((slideEl, index) => {
       const video = slideEl.querySelector('video');
       if (!video) return;
+      const isCurrent = activePost && index === activeIndex;
+      const isNext = activePost && index === activeIndex + 1;
+      const isPrevious = activePost && index === activeIndex - 1;
 
-      // IMPORTANT: do not call releaseRemoteVideo() for carousel slides.
-      // Keep src attached so Safari does not fall back to a frozen poster frame.
-      restoreCarouselSource(video);
-
-      if (activePost && index === (post.currentSlide || 0)) {
+      if (isCurrent) {
+        // Current slide: full preload + playback.
+        restoreCarouselSource(video, 'auto');
+        video.dataset.carouselWasActive = '1';
         playCarouselVideoReliably(video, postId);
-      } else {
-        try { video.pause(); } catch (_) {}
-        try { video.currentTime = 0; } catch (_) {}
-        video.preload = 'metadata';
-        if (typeof viewerVideoBuffering === 'function') viewerVideoBuffering(video, false);
+        return;
       }
+
+      try { video.pause(); } catch (_) {}
+
+      if (isNext) {
+        // Next slide: quietly buffer while the user watches this slide.
+        prewarmCarouselVideo(video);
+      } else if (isPrevious) {
+        // Previous slide: preserve its already-buffered source so swiping back
+        // starts quickly, but do not force a fresh network request.
+        if (video.getAttribute('src')) video.preload = 'auto';
+        else video.preload = 'none';
+      } else {
+        // Distant slides remain network-idle until they become the next slide.
+        // If a slide was already visited/prewarmed, keep its source attached;
+        // this avoids the iOS frozen-first-frame bug when returning to it.
+        if (video.getAttribute('src')) {
+          video.preload = 'none';
+        } else {
+          video.preload = 'none';
+        }
+      }
+
+      if (index !== activeIndex) {
+        try { video.currentTime = 0; } catch (_) {}
+      }
+      if (typeof viewerVideoBuffering === 'function') viewerVideoBuffering(video, false);
     });
 
     const current = typeof currentViewerCarouselVideo === 'function'
