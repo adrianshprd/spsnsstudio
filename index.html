@@ -2649,6 +2649,44 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
 .carousel-video-play svg { width: 42px !important; height: 42px !important; }
 </style>
 
+
+
+<style>
+/* ===== DESKTOP CAROUSEL: FIT ACTIVE MEDIA, NO SIDE LETTERBOX =====
+   Keep contain/no-crop behaviour, but make the media frame and post card follow
+   the real slide aspect ratio on desktop. */
+@media (min-width:736px) {
+  .post-viewer .viewer-feed-item .carousel-viewer,
+  .post-viewer .carousel-viewer {
+    width: var(--carousel-desktop-fit-width, min(470px, calc(100vw - 48px))) !important;
+    height: auto !important;
+    max-height: min(820px, 90vh) !important;
+  }
+
+  .post-viewer .carousel-viewer-media {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: 0 0 auto !important;
+    aspect-ratio: var(--active-carousel-ratio, 4 / 5) !important;
+    background: #fff !important;
+  }
+
+  .post-viewer .carousel-viewer-media .carousel-track,
+  .post-viewer .carousel-viewer-media .carousel-slide {
+    height: 100% !important;
+  }
+
+  .post-viewer .carousel-viewer-media .carousel-slide img,
+  .post-viewer .carousel-viewer-media .carousel-slide video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    object-position: center center !important;
+  }
+}
+</style>
+
 </head>
 <body class="auth-locked">
 <div aria-labelledby="authTitle" aria-modal="true" class="auth-overlay active" id="authOverlay" role="dialog">
@@ -5471,6 +5509,31 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     }
     if (width > 0 && height > 0) {
       mediaWrap.style.setProperty('--active-carousel-ratio', `${width} / ${height}`);
+
+      // Desktop: fit the viewer itself to the active media ratio instead of
+      // forcing portrait artwork into a fixed 4:5 frame. This preserves the
+      // complete image/video and removes the white bars at the sides.
+      const viewer = mediaWrap.closest('.carousel-viewer');
+      if (viewer && window.matchMedia('(min-width: 736px)').matches) {
+        const ratio = width / height;
+        const maxViewerWidth = Math.max(220, Math.min(470, window.innerWidth - 48));
+        const maxViewerHeight = Math.max(420, Math.min(820, window.innerHeight * 0.90));
+
+        const fitPass = () => {
+          // Everything except the media is the post chrome (header/actions/etc.).
+          const chromeHeight = Array.from(viewer.children).reduce((sum, child) => {
+            return child === mediaWrap ? sum : sum + child.getBoundingClientRect().height;
+          }, 0);
+          const availableMediaHeight = Math.max(220, maxViewerHeight - chromeHeight);
+          const fittedWidth = Math.max(220, Math.min(maxViewerWidth, availableMediaHeight * ratio));
+          viewer.style.setProperty('--carousel-desktop-fit-width', `${fittedWidth}px`);
+        };
+
+        fitPass();
+        // A narrower card can make the caption wrap, so measure once more after
+        // layout settles and keep the whole post inside the viewport.
+        requestAnimationFrame(fitPass);
+      }
     }
   }
 
