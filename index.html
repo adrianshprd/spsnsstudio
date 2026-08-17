@@ -6908,3 +6908,19 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
 </script>
 </body>
 </html>
+<style>
+/* ===== MOBILE CLIENT CAROUSEL: NO LETTERBOX BARS =====
+   Instagram fills the post media viewport on mobile. Crop overflow instead of
+   using object-fit: contain, which was creating white bands above/below media. */
+@media (max-width: 735px) {
+  .viewer-feed-item .carousel-viewer-media .carousel-slide img,
+  .viewer-feed-item .carousel-viewer-media .carousel-slide video,
+  .post-viewer .carousel-viewer-media .carousel-slide img,
+  .post-viewer .carousel-viewer-media .carousel-slide video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: 50% 50% !important;
+  }
+}
+</style>
