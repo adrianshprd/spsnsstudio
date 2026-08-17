@@ -5432,7 +5432,7 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
       const type = typeof slide === 'object' ? slide.type : 'image';
       const poster = typeof slide === 'object' ? (slide.thumbnailUrl || '') : '';
       const isInitialVideo = Number(id) === Number(viewerPostId) && index === slideIndex;
-      return `<div class="carousel-slide${isInitialVideo && type === 'video' ? ' viewer-video-is-buffering' : ''}">${type === 'video' ? `<video ${isInitialVideo ? `src="${url}"` : `data-src="${url}"`} ${poster ? `poster="${poster}"` : ''} crossorigin="anonymous" loop playsinline ${globalMuted ? 'muted' : ''} preload="${isInitialVideo ? 'auto' : 'none'}" onloadedmetadata="syncCarouselViewerAspect(${id}, this)" onloadstart="viewerVideoBuffering(this,true)" onwaiting="viewerVideoBuffering(this,true)" onplaying="viewerVideoStarted(this)" oncanplay="viewerVideoCanPlay(this)" onerror="viewerVideoFailed(this)"></video><div class="viewer-video-buffer" aria-hidden="true"></div>` : `<img src="${url}" crossorigin="anonymous" alt="carousel" onload="syncCarouselViewerAspect(${id}, this)">`}</div>`;
+      return `<div class="carousel-slide${isInitialVideo && type === 'video' ? ' viewer-video-is-buffering' : ''}">${type === 'video' ? `<video ${isInitialVideo ? `src="${url}"` : `data-src="${url}"`} ${poster ? `poster="${poster}"` : ''} crossorigin="anonymous" loop playsinline muted autoplay preload="${isInitialVideo ? 'auto' : 'none'}" onloadedmetadata="syncCarouselViewerAspect(${id}, this)" onloadstart="viewerVideoBuffering(this,true)" onwaiting="viewerVideoBuffering(this,true)" onplaying="viewerVideoStarted(this)" oncanplay="viewerVideoCanPlay(this)" onerror="viewerVideoFailed(this)"></video><div class="viewer-video-buffer" aria-hidden="true"></div>` : `<img src="${url}" crossorigin="anonymous" alt="carousel" onload="syncCarouselViewerAspect(${id}, this)">`}</div>`;
     }).join('');
     return `<div class="carousel-viewer">
       <div class="carousel-viewer-header"><div class="avatar">${post.avatar}</div><div class="post-header-info"><div class="username">${post.username}</div></div><button class="more-btn" onclick="closeViewer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -5523,17 +5523,33 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
   function viewerCarouselTogglePlay(postId = viewerPostId) {
     if (Date.now() - lastSwipeAt < 350) return;
     const video = currentViewerCarouselVideo(postId);
-    if (!video || !video.paused) return; // Carousel taps never pause a playing slide.
+    if (!video || !video.paused) return;
     const overlay = document.getElementById(`carousel-video-play-${postId}`);
     ensureViewerVideoReady(video);
+    video.muted = true;
     video.play().then(() => {
+      viewerVideoStarted(video);
       if (overlay) overlay.style.display = 'none';
+      const btn = document.getElementById(`carousel-video-mute-${postId}`);
+      if (btn) btn.innerHTML = soundIconSvg(true);
     }).catch(() => {
+      viewerVideoBuffering(video, false);
       if (overlay) overlay.style.display = 'flex';
     });
   }
 
-  function viewerCarouselToggleMute(postId = viewerPostId) { setGlobalMuted(!globalMuted); }
+  function viewerCarouselToggleMute(postId = viewerPostId) {
+    const video = currentViewerCarouselVideo(postId);
+    if (!video) return;
+    const targetMuted = !video.muted;
+    video.muted = targetMuted;
+    globalMuted = targetMuted;
+    video.dataset.autoplayMutedFallback = '';
+    updateViewerMuteButtons();
+    const btn = document.getElementById(`carousel-video-mute-${postId}`);
+    if (btn) btn.innerHTML = soundIconSvg(video.muted);
+    if (video.paused) video.play().catch(() => {});
+  }
 
   function viewerCarouselGo(postId, direction) {
     const post = posts.find(p => p.id === postId);
@@ -6070,23 +6086,43 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     const overlay = document.getElementById(`carousel-video-play-${postId}`);
     const muteBtn = document.getElementById(`carousel-video-mute-${postId}`);
 
-    // Never place an invisible full-screen pause target above an actively playing
-    // carousel video. It made horizontal swipes harder and caused accidental pauses.
+    // No full-slide pause target. The play control is only a fallback if both
+    // normal playback and muted autoplay are rejected by the mobile browser.
     if (overlay) overlay.style.display = 'none';
 
     track.querySelectorAll('.carousel-slide').forEach((slideEl, index) => {
       const video = slideEl.querySelector('video');
       if (!video) return;
-      video.muted = globalMuted;
+
       if (isActive && index === post.currentSlide) {
         ensureViewerVideoReady(video);
-        video.play().then(() => {
-          if (overlay) overlay.style.display = 'none';
-        }).catch(() => {
-          viewerVideoBuffering(video, false);
-          // Only show a small PLAY fallback when autoplay itself is blocked.
-          if (overlay) overlay.style.display = 'flex';
-        });
+        const wantsSound = !globalMuted;
+
+        // First try the user's current audio preference. Because this call runs
+        // immediately after opening/swiping, browsers often allow it directly.
+        video.muted = globalMuted;
+        const firstAttempt = video.play();
+
+        if (firstAttempt?.then) {
+          firstAttempt.then(() => {
+            video.dataset.autoplayMutedFallback = '';
+            viewerVideoStarted(video);
+            if (overlay) overlay.style.display = 'none';
+          }).catch(() => {
+            // iOS/Safari may reject unmuted programmatic playback after a swipe.
+            // Retry muted so the carousel always MOVES instead of looking frozen.
+            video.muted = true;
+            video.play().then(() => {
+              video.dataset.autoplayMutedFallback = wantsSound ? '1' : '';
+              viewerVideoStarted(video);
+              if (overlay) overlay.style.display = 'none';
+              if (wantsSound && muteBtn) muteBtn.innerHTML = soundIconSvg(true);
+            }).catch(() => {
+              viewerVideoBuffering(video, false);
+              if (overlay) overlay.style.display = 'flex';
+            });
+          });
+        }
       } else {
         releaseRemoteVideo(video);
         viewerVideoBuffering(video, false);
@@ -6096,7 +6132,8 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     const currentVideo = currentViewerCarouselVideo(postId);
     if (muteBtn) {
       muteBtn.style.display = currentVideo ? 'flex' : 'none';
-      muteBtn.innerHTML = soundIconSvg(globalMuted);
+      const locallyMuted = Boolean(currentVideo?.muted);
+      muteBtn.innerHTML = soundIconSvg(currentVideo ? locallyMuted : globalMuted);
     }
     bindPrecisionCarouselSwipe(postId);
   }
