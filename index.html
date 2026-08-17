@@ -2626,6 +2626,29 @@
   const SUPABASE_BUCKET = "post-media";
 const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
 </script>
+
+<style>
+/* Precision carousel gestures: vertical page scroll remains available, but
+   horizontal movement belongs to the carousel. */
+.carousel-viewer-media {
+  touch-action: pan-y pinch-zoom !important;
+  overscroll-behavior-x: contain;
+}
+/* A play control is only a small fallback if mobile autoplay is blocked.
+   It is never an invisible full-slide pause target. */
+.carousel-video-play {
+  inset: auto !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 58px !important;
+  height: 58px !important;
+  transform: translate(-50%, -50%) !important;
+  border-radius: 50% !important;
+  background: rgba(0,0,0,.28) !important;
+}
+.carousel-video-play svg { width: 42px !important; height: 42px !important; }
+</style>
+
 </head>
 <body class="auth-locked">
 <div aria-labelledby="authTitle" aria-modal="true" class="auth-overlay active" id="authOverlay" role="dialog">
@@ -5413,7 +5436,7 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     }).join('');
     return `<div class="carousel-viewer">
       <div class="carousel-viewer-header"><div class="avatar">${post.avatar}</div><div class="post-header-info"><div class="username">${post.username}</div></div><button class="more-btn" onclick="closeViewer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-      <div class="carousel-viewer-media viewer-transition-target" ontouchstart="swipeStart(event)" ontouchend="viewerSwipeEnd(event,${id})">
+      <div class="carousel-viewer-media viewer-transition-target" data-carousel-post-id="${id}">
         <div class="carousel-track" id="viewer-track-${id}" style="margin-left:-${slideIndex * 100}%;">${slidesHtml}</div>
         <div class="carousel-video-play" id="carousel-video-play-${id}" onclick="viewerCarouselTogglePlay(${id})" style="display:none"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
         <button class="carousel-video-mute" id="carousel-video-mute-${id}" onclick="viewerCarouselToggleMute(${id})" style="display:none">${soundIconSvg(globalMuted)}</button>
@@ -5498,12 +5521,16 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
   }
 
   function viewerCarouselTogglePlay(postId = viewerPostId) {
-    if (Date.now() - lastSwipeAt < 700) return;
+    if (Date.now() - lastSwipeAt < 350) return;
     const video = currentViewerCarouselVideo(postId);
-    if (!video) return;
-    if (video.paused) video.play().catch(() => {}); else video.pause();
-    const icon = document.querySelector(`#carousel-video-play-${postId} svg`);
-    if (icon) icon.style.display = video.paused ? 'block' : 'none';
+    if (!video || !video.paused) return; // Carousel taps never pause a playing slide.
+    const overlay = document.getElementById(`carousel-video-play-${postId}`);
+    ensureViewerVideoReady(video);
+    video.play().then(() => {
+      if (overlay) overlay.style.display = 'none';
+    }).catch(() => {
+      if (overlay) overlay.style.display = 'flex';
+    });
   }
 
   function viewerCarouselToggleMute(postId = viewerPostId) { setGlobalMuted(!globalMuted); }
@@ -5960,6 +5987,9 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     const reelItem = video?.closest?.('.reel-viewer');
     const overlay = reelItem?.querySelector?.('.reel-play-overlay');
     if (overlay) overlay.style.display = 'none';
+    const carouselViewer = video?.closest?.('.carousel-viewer');
+    const carouselPlay = carouselViewer?.querySelector?.('.carousel-video-play');
+    if (carouselPlay) carouselPlay.style.display = 'none';
   }
 
   function viewerVideoCanPlay(video) {
@@ -6037,34 +6067,38 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     const track = document.getElementById(`viewer-track-${postId}`);
     if (!post || !track) return;
     const isActive = Number(viewerPostId) === Number(postId);
+    const overlay = document.getElementById(`carousel-video-play-${postId}`);
+    const muteBtn = document.getElementById(`carousel-video-mute-${postId}`);
+
+    // Never place an invisible full-screen pause target above an actively playing
+    // carousel video. It made horizontal swipes harder and caused accidental pauses.
+    if (overlay) overlay.style.display = 'none';
+
     track.querySelectorAll('.carousel-slide').forEach((slideEl, index) => {
       const video = slideEl.querySelector('video');
       if (!video) return;
       video.muted = globalMuted;
       if (isActive && index === post.currentSlide) {
         ensureViewerVideoReady(video);
-        video.play().catch(() => {
+        video.play().then(() => {
+          if (overlay) overlay.style.display = 'none';
+        }).catch(() => {
           viewerVideoBuffering(video, false);
-          const icon = document.querySelector(`#carousel-video-play-${postId} svg`);
-          if (icon) icon.style.display = 'block';
+          // Only show a small PLAY fallback when autoplay itself is blocked.
+          if (overlay) overlay.style.display = 'flex';
         });
       } else {
         releaseRemoteVideo(video);
         viewerVideoBuffering(video, false);
       }
     });
-    const overlay = document.getElementById(`carousel-video-play-${postId}`);
-    const muteBtn = document.getElementById(`carousel-video-mute-${postId}`);
+
     const currentVideo = currentViewerCarouselVideo(postId);
-    if (overlay) {
-      overlay.style.display = currentVideo ? 'flex' : 'none';
-      const icon = overlay.querySelector('svg');
-      if (icon) icon.style.display = currentVideo?.paused ? 'block' : 'none';
-    }
     if (muteBtn) {
       muteBtn.style.display = currentVideo ? 'flex' : 'none';
       muteBtn.innerHTML = soundIconSvg(globalMuted);
     }
+    bindPrecisionCarouselSwipe(postId);
   }
 
   function initReelViewerVideo(post) {
@@ -7005,6 +7039,110 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
   }
 
 </script>
+
+<script>
+/* ===== PRECISION MOBILE CAROUSEL SWIPE =====
+ * Direction-locks a carousel gesture early. Horizontal intent owns the gesture
+ * and prevents the vertical neighbouring-post feed from moving. Vertical intent
+ * is left untouched so normal scrolling still works.
+ */
+const precisionCarouselBindings = new WeakSet();
+
+function bindPrecisionCarouselSwipe(postId = viewerPostId) {
+  const track = document.getElementById(`viewer-track-${postId}`);
+  const media = track?.closest?.('.carousel-viewer-media');
+  if (!track || !media || precisionCarouselBindings.has(media)) return;
+  precisionCarouselBindings.add(media);
+
+  let gesture = null;
+
+  const snapToCurrent = () => {
+    const post = posts.find(p => Number(p.id) === Number(postId));
+    if (!post) return;
+    track.style.transition = 'margin-left .26s cubic-bezier(.22,.72,.26,1)';
+    track.style.marginLeft = `-${(post.currentSlide || 0) * 100}%`;
+    window.setTimeout(() => { track.style.transition = ''; }, 280);
+  };
+
+  media.addEventListener('touchstart', event => {
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const post = posts.find(p => Number(p.id) === Number(postId));
+    if (!post) return;
+    gesture = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      lastX: touch.clientX,
+      lastY: touch.clientY,
+      startAt: performance.now(),
+      lock: null,
+      index: post.currentSlide || 0,
+      count: post.slides.length,
+      width: Math.max(1, media.clientWidth)
+    };
+  }, { passive: true });
+
+  media.addEventListener('touchmove', event => {
+    if (!gesture || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const dx = touch.clientX - gesture.startX;
+    const dy = touch.clientY - gesture.startY;
+    gesture.lastX = touch.clientX;
+    gesture.lastY = touch.clientY;
+
+    if (!gesture.lock && Math.max(Math.abs(dx), Math.abs(dy)) >= 6) {
+      // A slightly forgiving horizontal bias makes left/right slide changes
+      // intentional even when the finger drifts a little vertically.
+      gesture.lock = Math.abs(dx) >= Math.abs(dy) * 0.95 ? 'horizontal' : 'vertical';
+    }
+    if (gesture.lock !== 'horizontal') return;
+
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+    lastSwipeAt = Date.now();
+
+    let drag = dx;
+    const atFirst = gesture.index <= 0 && dx > 0;
+    const atLast = gesture.index >= gesture.count - 1 && dx < 0;
+    if (atFirst || atLast) drag *= 0.24; // IG-like resistance at either edge.
+
+    track.style.transition = 'none';
+    track.style.marginLeft = `${(-gesture.index * gesture.width) + drag}px`;
+  }, { passive: false });
+
+  const finish = event => {
+    if (!gesture) return;
+    const state = gesture;
+    gesture = null;
+    if (state.lock !== 'horizontal') return;
+
+    if (event.cancelable) event.preventDefault();
+    event.stopPropagation();
+    lastSwipeAt = Date.now();
+
+    const endTouch = event.changedTouches?.[0];
+    const endX = endTouch ? endTouch.clientX : state.lastX;
+    const dx = endX - state.startX;
+    const elapsed = Math.max(1, performance.now() - state.startAt);
+    const velocity = Math.abs(dx) / elapsed;
+    const distanceThreshold = Math.min(44, state.width * 0.11);
+    const fling = Math.abs(dx) > 22 && velocity > 0.28;
+    const shouldAdvance = Math.abs(dx) >= distanceThreshold || fling;
+
+    if (shouldAdvance && dx < 0 && state.index < state.count - 1) {
+      viewerCarouselGo(Number(postId), 1);
+    } else if (shouldAdvance && dx > 0 && state.index > 0) {
+      viewerCarouselGo(Number(postId), -1);
+    } else {
+      snapToCurrent();
+    }
+  };
+
+  media.addEventListener('touchend', finish, { passive: false });
+  media.addEventListener('touchcancel', finish, { passive: false });
+}
+</script>
+
 </body>
 </html>
 <style>
