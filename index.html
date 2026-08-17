@@ -5432,7 +5432,7 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
       const type = typeof slide === 'object' ? slide.type : 'image';
       const poster = typeof slide === 'object' ? (slide.thumbnailUrl || '') : '';
       const isInitialVideo = Number(id) === Number(viewerPostId) && index === slideIndex;
-      return `<div class="carousel-slide${isInitialVideo && type === 'video' ? ' viewer-video-is-buffering' : ''}">${type === 'video' ? `<video ${isInitialVideo ? `src="${url}"` : `data-src="${url}"`} ${poster ? `poster="${poster}"` : ''} crossorigin="anonymous" loop playsinline muted autoplay preload="${isInitialVideo ? 'auto' : 'none'}" onloadedmetadata="syncCarouselViewerAspect(${id}, this)" onloadstart="viewerVideoBuffering(this,true)" onwaiting="viewerVideoBuffering(this,true)" onplaying="viewerVideoStarted(this)" oncanplay="viewerVideoCanPlay(this)" onerror="viewerVideoFailed(this)"></video><div class="viewer-video-buffer" aria-hidden="true"></div>` : `<img src="${url}" crossorigin="anonymous" alt="carousel" onload="syncCarouselViewerAspect(${id}, this)">`}</div>`;
+      return `<div class="carousel-slide${isInitialVideo && type === 'video' ? ' viewer-video-is-buffering' : ''}">${type === 'video' ? `<video data-src="${url}" ${isInitialVideo ? `src="${url}"` : ''} ${poster ? `poster="${poster}"` : ''} loop playsinline webkit-playsinline muted autoplay preload="${isInitialVideo ? 'auto' : 'metadata'}" onloadedmetadata="syncCarouselViewerAspect(${id}, this)" onloadstart="viewerVideoBuffering(this,true)" onwaiting="viewerVideoBuffering(this,true)" onplaying="viewerVideoStarted(this)" oncanplay="viewerVideoCanPlay(this)" onerror="viewerVideoFailed(this)"></video><div class="viewer-video-buffer" aria-hidden="true"></div>` : `<img src="${url}" crossorigin="anonymous" alt="carousel" onload="syncCarouselViewerAspect(${id}, this)">`}</div>`;
     }).join('');
     return `<div class="carousel-viewer">
       <div class="carousel-viewer-header"><div class="avatar">${post.avatar}</div><div class="post-header-info"><div class="username">${post.username}</div></div><button class="more-btn" onclick="closeViewer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -7180,6 +7180,148 @@ function bindPrecisionCarouselSwipe(postId = viewerPostId) {
 }
 </script>
 
+
+<script>
+/* ===== CAROUSEL VIDEO PLAYBACK STABILITY PATCH =====
+   Keep carousel video sources attached while the viewer is open. On iOS,
+   repeatedly removing/re-attaching src while swiping can leave the poster/first
+   frame visible while playback never actually resumes. */
+(function () {
+  function carouselPost(postId) {
+    return posts.find(p => Number(p.id) === Number(postId));
+  }
+
+  function carouselTrack(postId) {
+    return document.getElementById(`viewer-track-${postId}`);
+  }
+
+  function restoreCarouselSource(video) {
+    if (!video) return false;
+    const source = video.dataset.src || video.getAttribute('src') || '';
+    if (!source) return false;
+    if (!video.getAttribute('src')) {
+      video.setAttribute('src', source);
+      try { video.load(); } catch (_) {}
+    }
+    video.preload = 'auto';
+    video.playsInline = true;
+    video.setAttribute('playsinline', '');
+    video.setAttribute('webkit-playsinline', '');
+    return true;
+  }
+
+  async function playCarouselVideoReliably(video, postId) {
+    if (!video || !restoreCarouselSource(video)) return false;
+    const overlay = document.getElementById(`carousel-video-play-${postId}`);
+    const muteBtn = document.getElementById(`carousel-video-mute-${postId}`);
+
+    // Muted playback is the reliable iOS/Safari path after a swipe.
+    const preferredMuted = Boolean(globalMuted);
+    video.muted = true;
+    video.defaultMuted = true;
+
+    try {
+      const promise = video.play();
+      if (promise?.then) await promise;
+      if (!preferredMuted) {
+        // A swipe is a user gesture on mobile, so restore the user's audio
+        // preference when Safari permits it. If not, video continues muted.
+        try { video.muted = false; } catch (_) {}
+      }
+      if (typeof viewerVideoStarted === 'function') viewerVideoStarted(video);
+      if (overlay) overlay.style.display = 'none';
+      if (muteBtn) {
+        muteBtn.style.display = 'flex';
+        if (typeof soundIconSvg === 'function') muteBtn.innerHTML = soundIconSvg(video.muted);
+      }
+      return true;
+    } catch (error) {
+      // One more retry after metadata/canplay has had a chance to arrive.
+      video.muted = true;
+      await new Promise(resolve => {
+        let done = false;
+        const finish = () => { if (done) return; done = true; resolve(); };
+        video.addEventListener('canplay', finish, { once:true });
+        video.addEventListener('loadeddata', finish, { once:true });
+        setTimeout(finish, 900);
+        try { video.load(); } catch (_) {}
+      });
+      try {
+        const retry = video.play();
+        if (retry?.then) await retry;
+        if (typeof viewerVideoStarted === 'function') viewerVideoStarted(video);
+        if (overlay) overlay.style.display = 'none';
+        if (muteBtn) {
+          muteBtn.style.display = 'flex';
+          if (typeof soundIconSvg === 'function') muteBtn.innerHTML = soundIconSvg(true);
+        }
+        return true;
+      } catch (_) {
+        if (typeof viewerVideoBuffering === 'function') viewerVideoBuffering(video, false);
+        if (overlay) overlay.style.display = 'flex';
+        return false;
+      }
+    }
+  }
+
+  window.syncViewerCarouselMedia = function (postId = viewerPostId) {
+    const post = carouselPost(postId);
+    const track = carouselTrack(postId);
+    if (!post || !track) return;
+    const activePost = Number(viewerPostId) === Number(postId);
+    const overlay = document.getElementById(`carousel-video-play-${postId}`);
+    const muteBtn = document.getElementById(`carousel-video-mute-${postId}`);
+
+    if (overlay) overlay.style.display = 'none';
+
+    track.querySelectorAll('.carousel-slide').forEach((slideEl, index) => {
+      const video = slideEl.querySelector('video');
+      if (!video) return;
+
+      // IMPORTANT: do not call releaseRemoteVideo() for carousel slides.
+      // Keep src attached so Safari does not fall back to a frozen poster frame.
+      restoreCarouselSource(video);
+
+      if (activePost && index === (post.currentSlide || 0)) {
+        playCarouselVideoReliably(video, postId);
+      } else {
+        try { video.pause(); } catch (_) {}
+        try { video.currentTime = 0; } catch (_) {}
+        video.preload = 'metadata';
+        if (typeof viewerVideoBuffering === 'function') viewerVideoBuffering(video, false);
+      }
+    });
+
+    const current = typeof currentViewerCarouselVideo === 'function'
+      ? currentViewerCarouselVideo(postId)
+      : null;
+    if (muteBtn) {
+      muteBtn.style.display = current ? 'flex' : 'none';
+      if (typeof soundIconSvg === 'function') muteBtn.innerHTML = soundIconSvg(current ? current.muted : globalMuted);
+    }
+    if (typeof bindPrecisionCarouselSwipe === 'function') bindPrecisionCarouselSwipe(postId);
+  };
+
+  window.initCarouselViewerVideo = function (post) {
+    if (!post) return;
+    window.syncViewerCarouselMedia(post.id);
+    requestAnimationFrame(() => {
+      if (typeof syncCarouselViewerAspect === 'function') syncCarouselViewerAspect(post.id);
+    });
+  };
+
+  // Tapping a carousel video never pauses it. This control is only a recovery
+  // play button if autoplay was blocked.
+  window.viewerCarouselTogglePlay = function (postId = viewerPostId) {
+    if (Date.now() - lastSwipeAt < 250) return;
+    const video = typeof currentViewerCarouselVideo === 'function'
+      ? currentViewerCarouselVideo(postId)
+      : null;
+    if (!video || !video.paused) return;
+    playCarouselVideoReliably(video, postId);
+  };
+})();
+</script>
 </body>
 </html>
 <style>
