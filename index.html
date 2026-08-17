@@ -536,20 +536,20 @@
   .grid-badge,
   .grid-reel-badge {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 7px;
+    right: 7px;
     z-index: 4;
     pointer-events: none;
-    width: 27px;
-    height: 27px;
+    width: 24px;
+    height: 24px;
     display:flex;
     align-items:center;
     justify-content:center;
   }
   .grid-badge svg,
   .grid-reel-badge svg {
-    width: 27px;
-    height: 27px;
+    width: 24px;
+    height: 24px;
     display: block;
     overflow: visible;
   }
@@ -1585,10 +1585,22 @@
   .grid-cell::after { content:''; position:absolute; inset:0; background:rgba(0,0,0,0); transition:background .15s; pointer-events:none; }
   .grid-cell:hover::after { background:rgba(0,0,0,.12); }
   .grid-cell:hover img, .grid-cell:hover video { opacity:1; }
-  .grid-badge { top: 10px; right: 10px; }
+  .grid-badge { top: 8px; right: 8px; }
   .grid-views { left: 10px; bottom: 8px; }
 
   @media (max-width: 735px) {
+    .grid-badge,
+    .grid-reel-badge {
+      top: 6px;
+      right: 6px;
+      width: 20px;
+      height: 20px;
+    }
+    .grid-badge svg,
+    .grid-reel-badge svg {
+      width: 20px;
+      height: 20px;
+    }
     .client-view header { display:none; }
     .ig-mobile-topbar {
       display:flex;
