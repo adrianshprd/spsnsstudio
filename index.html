@@ -1914,6 +1914,40 @@
   }
 
 
+  /* ===== MOBILE CAROUSEL: FIT FULL ARTWORK WITHOUT CROPPING =====
+   * The client post viewer follows the active slide's real aspect ratio instead
+   * of forcing every carousel into a fixed frame. This avoids both cropping and
+   * artificial letterbox bars. The post itself can scroll vertically, like IG.
+   */
+  @media (max-width:735px) {
+    .viewer-feed-item .carousel-viewer {
+      height:100dvh;
+      max-height:100dvh;
+      overflow-x:hidden;
+      overflow-y:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+    .viewer-feed-item .carousel-viewer-media {
+      flex:0 0 auto !important;
+      width:100% !important;
+      height:auto !important;
+      min-height:0 !important;
+      aspect-ratio:var(--active-carousel-ratio, 4 / 5) !important;
+      overflow:hidden;
+    }
+    .viewer-feed-item .carousel-viewer-media .carousel-track,
+    .viewer-feed-item .carousel-viewer-media .carousel-slide {
+      height:100% !important;
+    }
+    .viewer-feed-item .carousel-viewer-media .carousel-slide img,
+    .viewer-feed-item .carousel-viewer-media .carousel-slide video {
+      width:100% !important;
+      height:100% !important;
+      object-fit:contain !important;
+      object-position:center center !important;
+    }
+  }
+
   /* ===== CAROUSEL COLOUR-FIDELITY FIX =====
    * Keep client carousel artwork on a neutral white canvas. A black backing can
    * visibly darken PNGs/WebPs that contain transparency or soft alpha edges.
@@ -5341,7 +5375,7 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
       const type = typeof slide === 'object' ? slide.type : 'image';
       const poster = typeof slide === 'object' ? (slide.thumbnailUrl || '') : '';
       const isInitialVideo = Number(id) === Number(viewerPostId) && index === slideIndex;
-      return `<div class="carousel-slide${isInitialVideo && type === 'video' ? ' viewer-video-is-buffering' : ''}">${type === 'video' ? `<video ${isInitialVideo ? `src="${url}"` : `data-src="${url}"`} ${poster ? `poster="${poster}"` : ''} crossorigin="anonymous" loop playsinline ${globalMuted ? 'muted' : ''} preload="${isInitialVideo ? 'auto' : 'none'}" onloadstart="viewerVideoBuffering(this,true)" onwaiting="viewerVideoBuffering(this,true)" onplaying="viewerVideoStarted(this)" oncanplay="viewerVideoCanPlay(this)" onerror="viewerVideoFailed(this)"></video><div class="viewer-video-buffer" aria-hidden="true"></div>` : `<img src="${url}" crossorigin="anonymous" alt="carousel">`}</div>`;
+      return `<div class="carousel-slide${isInitialVideo && type === 'video' ? ' viewer-video-is-buffering' : ''}">${type === 'video' ? `<video ${isInitialVideo ? `src="${url}"` : `data-src="${url}"`} ${poster ? `poster="${poster}"` : ''} crossorigin="anonymous" loop playsinline ${globalMuted ? 'muted' : ''} preload="${isInitialVideo ? 'auto' : 'none'}" onloadedmetadata="syncCarouselViewerAspect(${id}, this)" onloadstart="viewerVideoBuffering(this,true)" onwaiting="viewerVideoBuffering(this,true)" onplaying="viewerVideoStarted(this)" oncanplay="viewerVideoCanPlay(this)" onerror="viewerVideoFailed(this)"></video><div class="viewer-video-buffer" aria-hidden="true"></div>` : `<img src="${url}" crossorigin="anonymous" alt="carousel" onload="syncCarouselViewerAspect(${id}, this)">`}</div>`;
     }).join('');
     return `<div class="carousel-viewer">
       <div class="carousel-viewer-header"><div class="avatar">${post.avatar}</div><div class="post-header-info"><div class="username">${post.username}</div></div><button class="more-btn" onclick="closeViewer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -5354,6 +5388,33 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
       <div class="carousel-viewer-actions"><button class="action-btn" onclick="toggleLike(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button><button class="action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></button><button class="action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button><button class="action-btn bookmark-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button></div>
       <div class="carousel-viewer-likes">${post.likes.toLocaleString()} likes</div><div class="carousel-viewer-caption"><span class="user">${post.username}</span> ${formatCaption(post.caption || '')}</div><div class="carousel-viewer-comments"><div class="view-all">View all 24 comments</div><div class="comment"><span class="user">client_name</span> Love this! 🔥</div><div class="comment"><span class="user">teammate_1</span> Looks amazing</div></div><div class="post-timestamp">2 hours ago</div><div class="carousel-viewer-input"><div class="avatar">YB</div><input type="text" placeholder="Add a comment..."><button class="send-btn">Post</button></div>
     </div>`;
+  }
+
+  function syncCarouselViewerAspect(postId = viewerPostId, mediaEl = null) {
+    const post = posts.find(p => Number(p.id) === Number(postId));
+    const track = document.getElementById(`viewer-track-${postId}`);
+    if (!post || !track) return;
+    const mediaWrap = track.closest('.carousel-viewer-media');
+    if (!mediaWrap) return;
+    const slides = track.querySelectorAll('.carousel-slide');
+    const activeSlide = slides[post.currentSlide || 0];
+    const media = mediaEl && activeSlide?.contains(mediaEl)
+      ? mediaEl
+      : activeSlide?.querySelector('img,video');
+    if (!media) return;
+
+    let width = 0;
+    let height = 0;
+    if (media.tagName === 'VIDEO') {
+      width = media.videoWidth || 0;
+      height = media.videoHeight || 0;
+    } else {
+      width = media.naturalWidth || 0;
+      height = media.naturalHeight || 0;
+    }
+    if (width > 0 && height > 0) {
+      mediaWrap.style.setProperty('--active-carousel-ratio', `${width} / ${height}`);
+    }
   }
 
   function currentViewerCarouselVideo(postId = viewerPostId) {
@@ -5423,10 +5484,14 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     const counter = document.getElementById(`viewer-slide-counter-${postId}`);
     if (counter) counter.textContent = `${post.currentSlide + 1}/${post.slides.length}`;
     syncViewerCarouselMedia(postId);
+    requestAnimationFrame(() => syncCarouselViewerAspect(postId));
   }
   function viewerCarouselNextSlide(postId = viewerPostId) { viewerCarouselGo(postId, 1); }
   function viewerCarouselPrevSlide(postId = viewerPostId) { viewerCarouselGo(postId, -1); }
-  function initCarouselViewerVideo(post) { syncViewerCarouselMedia(post.id); }
+  function initCarouselViewerVideo(post) {
+    syncViewerCarouselMedia(post.id);
+    requestAnimationFrame(() => syncCarouselViewerAspect(post.id));
+  }
 
   function initReelViewerVideo(post) {
     const video = document.getElementById(`viewer-reel-video-${post.id}`);
