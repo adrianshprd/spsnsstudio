@@ -4226,18 +4226,24 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
   }
 
 
-  /* ===== BACKGROUND MOBILE VIDEO PREVIEWS =====
-   * Originals remain untouched in Cloudflare R2. On capable desktop browsers,
-   * a separate 1280px-long-edge H.264/AAC MP4 is created in the background.
-   * Once ready, playback switches to that lighter fast-start copy, while the
-   * original key is retained as originalR2Key for deletion / future recovery.
+  /* ===== FREE PRE-UPLOAD VIDEO OPTIMISER =====
+   * Heavy desktop video uploads are converted locally in the browser BEFORE
+   * Cloudflare R2 upload. Only the web-friendly playback copy is stored in R2;
+   * production masters remain on the uploader's computer.
    *
-   * The optimiser is intentionally best-effort. Uploading and playback never
-   * depend on FFmpeg.wasm being available.
+   * Output target: MP4 / H.264 / AAC, max 1280px long edge, ~2.5 Mbps video,
+   * 96 kbps audio and +faststart for quicker progressive playback.
+   *
+   * Small/already-efficient videos are uploaded unchanged. Phones/tablets and
+   * files that are unsafe for in-browser transcoding fall back to the original
+   * file so an upload can never be blocked by FFmpeg.wasm.
    */
-  const MOBILE_PREVIEW_MIN_BYTES = 8 * 1024 * 1024;
+  const MOBILE_PREVIEW_MIN_BYTES = 10 * 1024 * 1024;
   const MOBILE_PREVIEW_MAX_BYTES = 180 * 1024 * 1024;
   const MOBILE_PREVIEW_MAX_SECONDS = 180;
+  const WEB_UPLOAD_TARGET_BITRATE = 2_500_000;
+  const WEB_UPLOAD_OPTIMISE_BITRATE = 3_200_000;
+  const WEB_UPLOAD_MAX_EDGE = 1280;
   let mobilePreviewFfmpeg = null;
   let mobilePreviewFfmpegPromise = null;
   let mobilePreviewProgressCallback = null;
@@ -4341,9 +4347,10 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     return true;
   }
 
-  async function transcodeMobilePreview(file, jobLabel = '') {
+  async function transcodeMobilePreview(file, jobLabel = '', onProgress = null, signal = null) {
     const metadata = await readVideoPreviewMetadata(file);
     if (!shouldCreateMobilePreview(file, metadata)) return null;
+    throwIfUploadCancelled(signal);
 
     const ffmpeg = await getMobilePreviewFfmpeg();
     const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -4353,9 +4360,9 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
 
     const args = ['-i', inputName, '-map', '0:v:0', '-map', '0:a?'];
     const maxDimension = Math.max(metadata.width || 0, metadata.height || 0);
-    if (maxDimension > 1280) {
-      if ((metadata.width || 0) >= (metadata.height || 0)) args.push('-vf', 'scale=1280:-2');
-      else args.push('-vf', 'scale=-2:1280');
+    if (maxDimension > WEB_UPLOAD_MAX_EDGE) {
+      if ((metadata.width || 0) >= (metadata.height || 0)) args.push('-vf', `scale=${WEB_UPLOAD_MAX_EDGE}:-2`);
+      else args.push('-vf', `scale=-2:${WEB_UPLOAD_MAX_EDGE}`);
     }
     args.push(
       '-c:v', 'libx264',
@@ -4363,7 +4370,7 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
       '-profile:v', 'main',
       '-pix_fmt', 'yuv420p',
       '-b:v', '2500k',
-      '-maxrate', '3000k',
+      '-maxrate', '2800k',
       '-bufsize', '5000k',
       '-c:a', 'aac',
       '-b:a', '96k',
@@ -4374,24 +4381,90 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
 
     try {
       mobilePreviewProgressCallback = progress => {
-        if (progress <= 0 || progress >= 1) return;
-        console.debug(`[mobile preview] ${jobLabel} ${Math.round(progress * 100)}%`);
+        const safeProgress = Math.max(0, Math.min(1, Number(progress) || 0));
+        onProgress?.(safeProgress);
+        if (safeProgress > 0 && safeProgress < 1) {
+          console.debug(`[web upload optimise] ${jobLabel} ${Math.round(safeProgress * 100)}%`);
+        }
       };
+      throwIfUploadCancelled(signal);
       await ffmpeg.writeFile(inputName, new Uint8Array(await file.arrayBuffer()));
+      throwIfUploadCancelled(signal);
       const exitCode = await ffmpeg.exec(args);
+      throwIfUploadCancelled(signal);
       if (exitCode !== 0) throw new Error(`FFmpeg exited with code ${exitCode}.`);
       const data = await ffmpeg.readFile(outputName);
       const bytes = data instanceof Uint8Array ? data : new Uint8Array(data.buffer || data);
       if (!bytes?.byteLength) throw new Error('The optimiser produced an empty preview.');
 
-      // If the re-encoded copy is somehow larger than the original, keep the
-      // original rather than wasting bandwidth/storage.
-      if (bytes.byteLength >= file.size * 1.02) return null;
-      return new File([bytes], `mobile-preview-${Date.now()}.mp4`, { type: 'video/mp4' });
+      // Never replace the source with a copy that is not meaningfully smaller.
+      if (bytes.byteLength >= file.size * 0.96) return null;
+      onProgress?.(1);
+      return new File([bytes], `web-${safeFileName(String(file.name || 'video').replace(/\.[^.]+$/, ''))}-${Date.now()}.mp4`, { type: 'video/mp4' });
     } finally {
       mobilePreviewProgressCallback = null;
       try { await ffmpeg.deleteFile(inputName); } catch (_) {}
       try { await ffmpeg.deleteFile(outputName); } catch (_) {}
+    }
+  }
+
+  function formatUploadMb(bytes) {
+    return `${(Math.max(0, Number(bytes) || 0) / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function shouldOptimiseVideoBeforeUpload(file, metadata) {
+    if (!file?.type?.startsWith('video/')) return false;
+    if (isLikelyMobileUploader()) return false;
+    if (file.size < MOBILE_PREVIEW_MIN_BYTES || file.size > MOBILE_PREVIEW_MAX_BYTES) return false;
+    if (metadata?.duration && metadata.duration > MOBILE_PREVIEW_MAX_SECONDS) return false;
+
+    const maxEdge = Math.max(Number(metadata?.width || 0), Number(metadata?.height || 0));
+    const duration = Number(metadata?.duration || 0);
+    const estimatedBitrate = duration > 0 ? (file.size * 8) / duration : 0;
+    return maxEdge > WEB_UPLOAD_MAX_EDGE || estimatedBitrate > WEB_UPLOAD_OPTIMISE_BITRATE || file.size > 24 * 1024 * 1024;
+  }
+
+  async function prepareVideoForFreeR2Upload(file, onStatus, signal) {
+    if (!file?.type?.startsWith('video/')) return { file, optimized: false, originalBytes: file?.size || 0 };
+
+    const metadata = await readVideoPreviewMetadata(file);
+    if (!shouldOptimiseVideoBeforeUpload(file, metadata)) {
+      return { file, optimized: false, originalBytes: file.size, metadata };
+    }
+
+    try {
+      onStatus?.({ phase: 'optimise', progress: 0, file, metadata });
+      const optimizedFile = await transcodeMobilePreview(
+        file,
+        file.name || 'video',
+        progress => onStatus?.({ phase: 'optimise', progress, file, metadata }),
+        signal
+      );
+      throwIfUploadCancelled(signal);
+      if (!optimizedFile) {
+        onStatus?.({ phase: 'optimiseSkipped', file, metadata, reason: 'no-size-gain' });
+        return { file, optimized: false, originalBytes: file.size, metadata };
+      }
+      onStatus?.({
+        phase: 'optimiseDone',
+        file,
+        metadata,
+        optimizedFile,
+        originalBytes: file.size,
+        optimizedBytes: optimizedFile.size
+      });
+      return {
+        file: optimizedFile,
+        optimized: true,
+        originalBytes: file.size,
+        optimizedBytes: optimizedFile.size,
+        metadata
+      };
+    } catch (error) {
+      if (error?.name === 'AbortError') throw error;
+      console.warn('Local web-video optimisation failed; uploading original instead:', error);
+      onStatus?.({ phase: 'optimiseFailed', file, metadata, error });
+      return { file, optimized: false, originalBytes: file.size, metadata, optimisationError: String(error?.message || error) };
     }
   }
 
@@ -5496,7 +5569,6 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
       // fast-start MP4 copy in the background for mobile/client playback.
       // This never blocks post creation; if optimisation is unsupported or fails,
       // the original media remains the active playback source.
-      void optimisePostVideosForMobilePreview(id, fileArray, uploadedItems);
     } catch (error) {
       const cancelled = error?.name === 'AbortError' || uploadCancelRequested;
       if (cancelled) console.info('Upload cancelled.');
@@ -6895,10 +6967,32 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     const user = session?.user;
     if (!user) throw new Error('Please sign in before uploading.');
 
-    const uniqueName = `${Date.now()}-${crypto.randomUUID()}-${safeFileName(file.name)}`;
-    const r2Key = `${user.id}/posts/${uniqueName}`;
-    onStatus?.({ phase: 'upload', loaded: 0, total: file.size, file });
-    await uploadBinaryToR2(r2Key, file, (loaded, total) => onStatus?.({ phase: 'upload', loaded, total, file }), signal);
+    // Free optimisation path: heavy desktop videos are converted BEFORE upload,
+    // so R2 stores only the playback-friendly copy rather than both master+preview.
+    const prepared = await prepareVideoForFreeR2Upload(file, onStatus, signal);
+    throwIfUploadCancelled(signal);
+    const uploadFile = prepared.file || file;
+    const baseName = prepared.optimized
+      ? `${Date.now()}-${crypto.randomUUID()}-web-preview.mp4`
+      : `${Date.now()}-${crypto.randomUUID()}-${safeFileName(file.name)}`;
+    const r2Key = `${user.id}/posts/${baseName}`;
+
+    onStatus?.({
+      phase: 'upload',
+      loaded: 0,
+      total: uploadFile.size,
+      file,
+      uploadFile,
+      optimized: prepared.optimized,
+      originalBytes: prepared.originalBytes,
+      optimizedBytes: prepared.optimizedBytes
+    });
+    await uploadBinaryToR2(r2Key, uploadFile, (loaded, total) => onStatus?.({
+      phase: 'upload', loaded, total, file, uploadFile,
+      optimized: prepared.optimized,
+      originalBytes: prepared.originalBytes,
+      optimizedBytes: prepared.optimizedBytes
+    }), signal);
     onKey?.(r2Key);
     throwIfUploadCancelled(signal);
     const url = await getR2SignedUrl(r2Key, true);
@@ -6931,7 +7025,10 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
       thumbnailUrl,
       thumbnailR2Key,
       thumbnailProvider: thumbnailR2Key ? 'r2' : null,
-      mediaType: file.type.startsWith('video/') ? 'video' : 'image'
+      mediaType: file.type.startsWith('video/') ? 'video' : 'image',
+      webOptimized: Boolean(prepared.optimized),
+      originalBytes: Number(prepared.originalBytes || file.size || 0),
+      uploadBytes: Number(uploadFile.size || 0)
     };
   }
 
@@ -6942,7 +7039,7 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
     const largeVideos = fileArray.filter(file => file.type.startsWith('video/') && file.size > 100 * 1024 * 1024);
     if (largeVideos.length) {
       const totalMb = Math.round(largeVideos.reduce((sum, file) => sum + file.size, 0) / 1024 / 1024);
-      const proceed = confirm(`${largeVideos.length} video${largeVideos.length === 1 ? '' : 's'} total about ${totalMb} MB. Large originals can still load slowly on phones. Continue uploading to Cloudflare R2?`);
+      const proceed = confirm(`${largeVideos.length} video${largeVideos.length === 1 ? '' : 's'} total about ${totalMb} MB. On desktop, Shepherd will try to create a lighter H.264 web copy before uploading it to R2. This can take a little time, but should make phone playback faster. Continue?`);
       if (!proceed) return;
     }
 
@@ -6984,10 +7081,36 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
         throwIfUploadCancelled(signal);
         const file = fileArray[i];
         const item = await uploadMediaFile(file, status => {
-          if (status.phase === 'upload') {
-            const withinFile = Math.max(0, Math.min(1, (status.loaded || 0) / Math.max(1, status.total || file.size || 1)));
-            const percent = 5 + ((i + withinFile * .95) / fileArray.length) * 88;
-            setUploadProgress(percent, `Uploading media ${i + 1} of ${fileArray.length}…`, file.name);
+          const segmentStart = 5 + (i / fileArray.length) * 88;
+          const segmentSize = 88 / fileArray.length;
+          if (status.phase === 'optimise') {
+            const p = Math.max(0, Math.min(1, Number(status.progress || 0)));
+            setUploadProgress(
+              segmentStart + segmentSize * 0.38 * p,
+              `Optimising video ${i + 1} of ${fileArray.length}…`,
+              `${file.name} • creating lighter H.264 preview before upload`
+            );
+          } else if (status.phase === 'optimiseDone') {
+            setUploadProgress(
+              segmentStart + segmentSize * 0.38,
+              `Video ${i + 1} optimised`,
+              `${formatUploadMb(status.originalBytes)} → ${formatUploadMb(status.optimizedBytes)}`
+            );
+          } else if (status.phase === 'optimiseFailed') {
+            setUploadProgress(
+              segmentStart,
+              `Using original video ${i + 1}`,
+              'Local optimisation was unavailable; upload will continue normally.'
+            );
+          } else if (status.phase === 'upload') {
+            const withinFile = Math.max(0, Math.min(1, (status.loaded || 0) / Math.max(1, status.total || status.uploadFile?.size || file.size || 1)));
+            const optimiseShare = status.optimized ? 0.38 : 0;
+            const uploadShare = status.optimized ? 0.62 : 1;
+            const percent = segmentStart + segmentSize * (optimiseShare + withinFile * uploadShare);
+            const detail = status.optimized
+              ? `${file.name} • ${formatUploadMb(status.total)} web preview`
+              : file.name;
+            setUploadProgress(percent, `Uploading media ${i + 1} of ${fileArray.length}…`, detail);
           }
         }, {
           generateThumbnail: false,
@@ -7017,6 +7140,9 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
           videoUrl: videos[0].url,
           storageProvider: 'r2',
           r2Key: videos[0].r2Key,
+          webOptimized: Boolean(videos[0].webOptimized),
+          originalBytes: Number(videos[0].originalBytes || 0),
+          uploadBytes: Number(videos[0].uploadBytes || 0),
           thumbnail: preparedCoverResult?.thumbnailUrl || '',
           thumbnailProvider: preparedCoverResult?.thumbnailR2Key ? 'r2' : null,
           thumbnailR2Key: preparedCoverResult?.thumbnailR2Key || null,
@@ -7031,6 +7157,9 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
           type: item.mediaType,
           storageProvider: 'r2',
           r2Key: item.r2Key,
+          webOptimized: Boolean(item.webOptimized),
+          originalBytes: Number(item.originalBytes || 0),
+          uploadBytes: Number(item.uploadBytes || 0),
           thumbnailUrl: index === 0 && item.mediaType === 'video'
             ? (preparedCoverResult?.thumbnailUrl || '')
             : (item.thumbnailUrl || ''),
@@ -7060,7 +7189,7 @@ const R2_SIGNER_URL = "https://shepherd-r2-signer.shepherdsns.workers.dev";
       await savePosts();
       renderGallery();
       if (input) input.value = '';
-      setUploadProgress(100, 'Upload complete', 'Media saved to Cloudflare R2');
+      setUploadProgress(100, 'Upload complete', videos.some(item => item.webOptimized) ? 'Optimised playback media saved to Cloudflare R2' : 'Media saved to Cloudflare R2');
       setTimeout(resetUploadProgress, 850);
 
       if (firstFileIsVideo && !preparedCoverResult) {
